@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>程序员年夜饭 · 红红火火过大年</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧨</text></svg>">
+<style>
+:root{
+  --red-deep:#4d080c; --red-dark:#6d0f13; --red:#8a1418; --red-bright:#b01e28;
+  --gold:#f7d794; --gold-bright:#ffd700; --gold-dim:#e6b422; --gold-deep:#b8860b;
+  --cream:#fff5e6; --ink:#3a0507;
+  --kai:"KaiTi","STKaiti","楷体","BiauKai",serif;
+  --mono:"Cascadia Code","JetBrains Mono",Consolas,"Courier New",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:"Microsoft YaHei","PingFang SC",sans-serif;
+  color:var(--cream);
+  min-height:100vh;
+  background-color:var(--red-dark);
+  background-image:
+    radial-gradient(rgba(255,215,0,.045) 1px, transparent 1.6px),
+    linear-gradient(180deg,#5c0a0e 0%,#7c1216 30%,#8a1418 55%,#5c0a0e 100%);
+  background-size:26px 26px,auto;
+  background-attachment:fixed;
+  overflow-x:hidden;
+}
+body::before{ /* 暗角氛围 */
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:1;
+  background:radial-gradient(ellipse at 50% 30%, transparent 55%, rgba(30,0,2,.55) 100%);
+}
+#fireworks{position:fixed;inset:0;z-index:2;pointer-events:none}
+
+/* ============ 灯笼 ============ */
+.lanterns{position:fixed;top:0;left:0;right:0;height:150px;z-index:3;pointer-events:none}
+.lantern{position:absolute;top:-6px;transform-origin:top center;animation:sway 3.6s ease-in-out infinite alternate}
+.lantern .rope{width:2px;height:38px;margin:0 auto;background:linear-gradient(#e6b422,#9c6b10)}
+.lantern .cap,.lantern .cap-b{width:34px;height:9px;margin:0 auto;border-radius:3px;
+  background:linear-gradient(180deg,#ffe08a,#c8922a);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.lantern .cap-b{border-radius:3px 3px 6px 6px}
+.lantern .body{
+  width:82px;height:66px;border-radius:50%;position:relative;
+  background:radial-gradient(circle at 34% 32%,#ff7a63,#e0202f 52%,#8f0f1d 96%);
+  border:1px solid rgba(255,215,0,.55);
+  box-shadow:inset -8px -8px 16px rgba(80,0,0,.45),inset 4px 6px 12px rgba(255,255,210,.25),0 0 26px rgba(255,90,60,.5);
+  display:flex;align-items:center;justify-content:center;
+}
+.lantern .body::before,.lantern .body::after{ /* 灯笼骨架线 */
+  content:"";position:absolute;border-radius:50%;border:1px solid rgba(255,215,0,.28)}
+.lantern .body::before{inset:4px 14px}
+.lantern .body::after{inset:4px 28px}
+.lantern .char{font-family:var(--kai);font-size:30px;font-weight:700;color:var(--gold-bright);
+  text-shadow:0 0 8px rgba(255,200,0,.9),0 2px 2px rgba(120,0,0,.8)}
+.lantern .tassel{width:4px;height:30px;margin:0 auto;background:linear-gradient(#e6b422,#ffec9e,#c8922a);border-radius:2px}
+.lantern .tassel::after{content:"";display:block;width:10px;height:14px;margin:0 auto;border-radius:0 0 6px 6px;
+  background:linear-gradient(#ffd700,#b8860b);box-shadow:0 2px 4px rgba(0,0,0,.4)}
+.lantern.big{transform:scale(1.22)}
+@keyframes sway{from{transform:rotate(4.5deg)}to{transform:rotate(-4.5deg)}}
+
+/* ============ 春联 ============ */
+.couplet{position:fixed;top:120px;width:64px;z-index:3;display:flex;flex-direction:column;align-items:center;
+  filter:drop-shadow(0 6px 14px rgba(0,0,0,.45));pointer-events:none}
+.couplet.left{left:14px}.couplet.right{right:14px}
+.couplet .top{width:52px;height:16px;background:linear-gradient(#ffe08a,#c8922a);border-radius:3px;margin-bottom:6px}
+.couplet .paper{writing-mode:vertical-rl;font-family:var(--kai);font-size:30px;font-weight:700;letter-spacing:.35em;
+  padding:22px 12px;color:#ffd700;background:linear-gradient(160deg,#c0182a,#8a0f1e);
+  border:2px solid rgba(255,215,0,.6);border-radius:6px;text-shadow:0 0 10px rgba(255,170,0,.55)}
+@media (max-width:1240px){.couplet{display:none}}
+
+/* ============ 窗花角饰 ============ */
+.corner{position:fixed;width:150px;height:150px;z-index:3;pointer-events:none;opacity:.5}
+.corner svg{width:100%;height:100%}
+.corner.tl{top:0;left:0}
+.corner.tr{top:0;right:0;transform:scaleX(-1)}
+.corner.bl{bottom:0;left:0;transform:scaleY(-1)}
+.corner.br{bottom:0;right:0;transform:scale(-1,-1)}
+@media (max-width:900px){.corner{width:90px;height:90px;opacity:.35}}
+
+/* ============ 头部 ============ */
+header{position:relative;z-index:5;text-align:center;padding:96px 20px 34px}
+.hpai{ /* 横批 */
+  display:inline-block;font-family:var(--kai);font-size:26px;letter-spacing:.5em;text-indent:.5em;
+  color:var(--ink);padding:8px 26px;margin-bottom:18px;
+  background:linear-gradient(180deg,#ffe9a8,#e6b422);border-radius:8px;
+  border:2px solid #8a5a00;box-shadow:0 4px 18px rgba(255,180,0,.35),inset 0 1px 0 #fff8dc;
+  font-weight:700;transform:rotate(-1.2deg);
+}
+.fu-row{display:flex;align-items:center;justify-content:center;gap:26px;margin:6px 0 10px}
+.fu{width:78px;height:78px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(150deg,#d4232e,#9c101d);border:3px solid var(--gold-bright);
+  border-radius:10px;box-shadow:0 0 30px rgba(255,60,40,.6),inset 0 0 18px rgba(0,0,0,.3);
+  animation:fuspin 8s ease-in-out infinite}
+.fu span{transform:rotate(-45deg);font-family:var(--kai);font-size:46px;font-weight:700;color:var(--gold-bright);
+  text-shadow:0 0 12px rgba(255,190,0,.9)}
+.fu.small{width:56px;height:56px}.fu.small span{font-size:32px}
+@keyframes fuspin{0%,100%{transform:rotate(38deg) scale(1)}50%{transform:rotate(52deg) scale(1.06)}}
+h1.title{
+  font-family:var(--kai);font-size:clamp(44px,7vw,84px);font-weight:700;letter-spacing:.08em;line-height:1.15;
+  background:linear-gradient(180deg,#fff3c4 8%,#ffd700 38%,#e8a20c 55%,#ffe9a0 78%,#f7c833 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 4px 3px rgba(60,0,0,.65)) drop-shadow(0 0 22px rgba(255,160,0,.35));
+  animation:shimmer 5s linear infinite;background-size:100% 300%;
+}
+@keyframes shimmer{0%{background-position:0 130%}100%{background-position:0 -30%}}
+.subtitle{margin-top:14px;font-size:16px;color:#ffd9a8;letter-spacing:.12em}
+.commit{
+  display:inline-block;margin-top:16px;font-family:var(--mono);font-size:14px;color:#ffe9b0;
+  background:rgba(50,4,6,.72);border:1px solid rgba(230,180,34,.55);border-radius:10px;
+  padding:10px 18px;box-shadow:inset 0 0 18px rgba(0,0,0,.35)
+}
+.commit .p{color:#ff8f70}.commit .m{color:#9fe08c}
+.commit .cursor{display:inline-block;width:8px;height:15px;background:#ffe9b0;vertical-align:-2px;
+  animation:blink 1s steps(1) infinite;margin-left:2px}
+@keyframes blink{50%{opacity:0}}
+.stats{margin-top:18px;font-size:14px;color:#f2c384;letter-spacing:.14em}
+.stats b{color:var(--gold-bright);font-size:18px;font-family:var(--kai)}
+
+/* ============ 分类导航 ============ */
+nav.cats{position:relative;z-index:5;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
+  padding:10px 16px 22px;max-width:1080px;margin:0 auto}
+.tab{
+  font-family:var(--kai);font-size:17px;letter-spacing:.1em;cursor:pointer;user-select:none;
+  color:var(--gold);background:rgba(90,8,10,.55);border:1.5px solid rgba(230,180,34,.45);
+  padding:8px 20px;border-radius:999px;transition:.22s;backdrop-filter:blur(2px)
+}
+.tab:hover{border-color:var(--gold-bright);color:var(--gold-bright);transform:translateY(-2px)}
+.tab.active{background:linear-gradient(180deg,#ffe08a,#e6b422);color:var(--ink);font-weight:700;
+  border-color:var(--gold-bright);box-shadow:0 4px 16px rgba(255,190,0,.4)}
+.tab.lucky{border-style:dashed;position:relative}
+.tab.lucky:hover{transform:translateY(-2px) rotate(-1.5deg)}
+
+/* ============ 卡片网格 ============ */
+main{position:relative;z-index:5;max-width:1180px;margin:0 auto;padding:6px 22px 60px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:22px}
+.card{
+  position:relative;border-radius:18px;overflow:hidden;cursor:pointer;
+  background:linear-gradient(165deg,#b01e28,#7c1016 70%);
+  border:2px solid rgba(255,215,0,.5);box-shadow:0 10px 26px rgba(35,0,2,.45);
+  transition:transform .28s,box-shadow .28s,border-color .28s;
+  animation:cardin .5s cubic-bezier(.2,.7,.3,1.2) both
+}
+@keyframes cardin{from{opacity:0;transform:translateY(26px) scale(.96)}to{opacity:1;transform:none}}
+.card:hover{transform:translateY(-8px);border-color:var(--gold-bright);
+  box-shadow:0 18px 40px rgba(30,0,2,.6),0 0 26px rgba(255,180,60,.35)}
+.pic{position:relative;aspect-ratio:4/3;overflow:hidden}
+.pic img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s}
+.card:hover .pic img{transform:scale(1.07)}
+.pic .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:74px;
+  background:
+    radial-gradient(circle at 30% 25%,rgba(255,200,120,.16),transparent 55%),
+    repeating-radial-gradient(circle at 50% 60%,rgba(255,215,0,.05) 0 3px,transparent 3px 26px),
+    linear-gradient(160deg,#a31621,#6d0f13)}
+.pic .ph span{filter:drop-shadow(0 6px 10px rgba(40,0,0,.5));transform:translateY(2px)}
+.pic::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,transparent 55%,rgba(70,3,5,.78));pointer-events:none}
+.card .badge{position:absolute;top:10px;right:10px;z-index:2;font-family:var(--kai);font-size:13px;
+  color:var(--ink);background:linear-gradient(180deg,#ffe08a,#e6b422);padding:3px 12px;border-radius:999px;
+  font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.4);letter-spacing:.08em}
+.card .body{padding:13px 15px 15px}
+.card h3{font-family:var(--kai);font-size:23px;color:var(--gold-bright);letter-spacing:.06em;
+  text-shadow:0 1px 2px rgba(60,0,0,.6);display:flex;align-items:baseline;gap:8px}
+.card h3 .tag{font-size:12px;color:var(--ink);background:linear-gradient(180deg,#ffe08a,#e6b422);
+  padding:2px 9px;border-radius:999px;font-family:"Microsoft YaHei";font-weight:700;white-space:nowrap;letter-spacing:.04em}
+.card .intro{font-size:12.5px;color:#ffd9b0;line-height:1.6;margin-top:7px;height:40px;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.card .meta{display:flex;gap:14px;margin-top:10px;font-size:12px;color:#f0b78a;align-items:center;flex-wrap:wrap}
+.card .meta .stars{color:var(--gold-bright);letter-spacing:1px}
+.card .meta .go{margin-left:auto;color:var(--gold);opacity:.85;transition:.2s}
+.card:hover .meta .go{opacity:1;transform:translateX(3px)}
+
+/* ============ Modal ============ */
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(40,0,3,.78);backdrop-filter:blur(5px);
+  display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:38px 16px 60px}
+.overlay.show{display:flex;animation:fadein .25s ease both}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.modal{
+  width:min(880px,100%);border-radius:22px;overflow:hidden;position:relative;
+  background:linear-gradient(170deg,#a31621,#5c0a0e 75%);
+  border:2px solid rgba(255,215,0,.6);box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 40px rgba(255,120,60,.18);
+  animation:pop .34s cubic-bezier(.2,.8,.3,1.15) both
+}
+@keyframes pop{from{opacity:0;transform:translateY(30px) scale(.95)}to{opacity:1;transform:none}}
+.m-hero{position:relative;height:230px;overflow:hidden}
+.m-hero img{width:100%;height:100%;object-fit:cover}
+.m-hero .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:110px;
+  background:repeating-radial-gradient(circle at 50% 65%,rgba(255,215,0,.06) 0 4px,transparent 4px 34px),
+  linear-gradient(160deg,#96201f,#5c0a0e)}
+.m-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(60,2,4,.15),rgba(70,3,5,.9) 92%)}
+.m-close{position:absolute;top:14px;right:16px;z-index:3;width:38px;height:38px;border-radius:50%;
+  background:rgba(40,0,2,.65);border:1.5px solid rgba(255,215,0,.6);color:var(--gold-bright);
+  font-size:20px;line-height:1;cursor:pointer;transition:.2s;display:flex;align-items:center;justify-content:center}
+.m-close:hover{background:var(--gold-bright);color:var(--ink);transform:rotate(90deg)}
+.m-head{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:18px 26px;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.m-head h2{font-family:var(--kai);font-size:clamp(30px,5vw,44px);color:var(--gold-bright);
+  text-shadow:0 2px 6px rgba(60,0,0,.7);letter-spacing:.06em}
+.m-head .tag{font-family:var(--kai);font-size:15px;color:var(--ink);font-weight:700;
+  background:linear-gradient(180deg,#ffe08a,#e6b422);padding:4px 14px;border-radius:999px;
+  box-shadow:0 2px 10px rgba(0,0,0,.45)}
+.m-body{padding:20px 26px 28px}
+.chips{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:20px}
+.chip{font-size:12.5px;color:#ffdca6;border:1px solid rgba(230,180,34,.45);background:rgba(70,5,7,.5);
+  border-radius:999px;padding:5px 14px;letter-spacing:.04em}
+.chip b{color:var(--gold-bright)}
+.chip .stars{color:var(--gold-bright);letter-spacing:1px}
+.intro-p{font-size:14.5px;line-height:1.9;color:#ffe3c2;margin-bottom:22px;
+  padding:14px 18px;border-left:3px solid var(--gold-dim);background:rgba(255,215,0,.05);border-radius:0 10px 10px 0}
+.sect{margin-bottom:26px}
+.sect-h{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.sect-h .n{font-family:var(--kai);width:34px;height:34px;border-radius:50%;flex:none;
+  border:2px solid var(--gold-bright);color:var(--gold-bright);display:flex;align-items:center;justify-content:center;
+  font-size:17px;box-shadow:0 0 12px rgba(255,190,0,.3)}
+.sect-h h4{font-family:var(--kai);font-size:23px;color:var(--gold);letter-spacing:.15em}
+.sect-h .line{flex:1;height:1px;background:linear-gradient(90deg,rgba(230,180,34,.55),transparent)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px 26px}
+@media (max-width:640px){.two-col{grid-template-columns:1fr}}
+.ing{display:flex;gap:9px;font-size:14px;color:#ffe6c4;line-height:1.75;align-items:baseline}
+.ing::before{content:"";width:7px;height:7px;border-radius:50%;flex:none;transform:translateY(-1px);
+  background:radial-gradient(circle at 35% 35%,#ffe9a8,#c8922a)}
+.calc-note{font-size:13px;color:#f2c384;margin-bottom:10px;font-style:italic}
+.subg-h{font-family:var(--kai);font-size:18px;color:#ffb84d;margin:18px 0 10px;letter-spacing:.1em;
+  display:flex;align-items:center;gap:8px}
+.subg-h::before{content:"◆";font-size:11px;color:var(--gold-dim)}
+.step{display:flex;gap:13px;margin-bottom:12px}
+.step .num{flex:none;width:29px;height:29px;border-radius:50%;margin-top:1px;
+  border:1.5px solid var(--gold);color:var(--gold-bright);display:flex;align-items:center;justify-content:center;
+  font-family:var(--kai);font-size:15px;background:rgba(80,6,8,.55)}
+.step .txt{font-size:14.5px;line-height:1.8;color:#ffe9cd}
+.step .subs{margin-top:6px;padding-left:12px;border-left:2px dotted rgba(230,180,34,.4)}
+.step .subs div{font-size:13px;color:#ffd9a8;line-height:1.7}
+.tip-li{display:flex;gap:10px;font-size:14px;line-height:1.75;color:#ffe6c4;margin-bottom:9px}
+.tip-li .ic{flex:none}
+.m-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  margin-top:6px;padding-top:18px;border-top:1px dashed rgba(230,180,34,.35)}
+.m-foot .wish{font-family:var(--kai);font-size:18px;color:var(--gold);letter-spacing:.2em}
+.m-foot a.repo{font-family:var(--mono);font-size:12.5px;color:#ffb98a;text-decoration:none;
+  border:1px solid rgba(230,180,34,.4);padding:7px 14px;border-radius:8px;transition:.2s}
+.m-foot a.repo:hover{background:rgba(255,215,0,.12);color:var(--gold-bright)}
+
+/* ============ 页脚 ============ */
+footer{position:relative;z-index:5;text-align:center;padding:34px 18px 46px;color:#d99a63;font-size:13px;line-height:2}
+footer a{color:var(--gold);text-decoration:none;border-bottom:1px dashed rgba(230,180,34,.5)}
+footer a:hover{color:var(--gold-bright)}
+footer .big{font-family:var(--kai);font-size:21px;color:var(--gold-bright);letter-spacing:.35em;margin-bottom:6px}
+
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-track{background:#4d080c}
+::-webkit-scrollbar-thumb{background:linear-gradient(#e6b422,#8a5a00);border-radius:5px}
+</style>
+</head>
+<body>
+
+<canvas id="fireworks"></canvas>
+
+<div class="lanterns" id="lanterns"></div>
+
+<aside class="couplet left"><div class="top"></div><div class="paper">敲代码码到成功</div></aside>
+<aside class="couplet right"><div class="top"></div><div class="paper">做美食食全食美</div></aside>
+
+<div class="corner tl"><svg viewBox="0 0 200 200" fill="none"><g stroke="#e6b422" stroke-width="1.6" opacity=".9"><path d="M8 8 L64 8 M8 8 L8 64"/><path d="M20 20 C60 24 68 30 70 70" /><path d="M20 34 C46 38 52 44 54 68"/><path d="M34 20 C38 46 44 52 68 54"/><circle cx="86" cy="86" r="10"/><circle cx="86" cy="86" r="4" fill="#e6b422"/><path d="M86 76 C96 62 112 58 126 64 C114 66 104 74 98 84"/><path d="M96 86 C110 76 126 76 138 84 C126 84 114 88 104 94"/><path d="M86 96 C96 110 112 114 126 108 C114 106 104 98 98 88"/><path d="M76 86 C62 96 60 112 66 126 C68 114 76 104 86 98"/><path d="M76 76 C62 66 46 66 34 74 C46 74 58 78 68 84"/><circle cx="150" cy="44" r="5"/><circle cx="152" cy="66" r="3"/><circle cx="44" cy="150" r="5"/><circle cx="66" cy="152" r="3"/><path d="M138 96 C150 100 156 108 156 120"/><path d="M96 138 C100 150 108 156 120 156"/></g></svg></div>
+<div class="corner tr"><svg viewBox="0 0 200 200" fill="none"><g stroke="#e6b422" stroke-width="1.6" opacity=".9"><path d="M8 8 L64 8 M8 8 L8 64"/><path d="M20 20 C60 24 68 30 70 70" /><path d="M20 34 C46 38 52 44 54 68"/><path d="M34 20 C38 46 44 52 68 54"/><circle cx="86" cy="86" r="10"/><circle cx="86" cy="86" r="4" fill="#e6b422"/><path d="M86 76 C96 62 112 58 126 64 C114 66 104 74 98 84"/><path d="M96 86 C110 76 126 76 138 84 C126 84 114 88 104 94"/><path d="M86 96 C96 110 112 114 126 108 C114 106 104 98 98 88"/><path d="M76 86 C62 96 60 112 66 126 C68 114 76 104 86 98"/><path d="M76 76 C62 66 46 66 34 74 C46 74 58 78 68 84"/><circle cx="150" cy="44" r="5"/><circle cx="152" cy="66" r="3"/><circle cx="44" cy="150" r="5"/><circle cx="66" cy="152" r="3"/><path d="M138 96 C150 100 156 108 156 120"/><path d="M96 138 C100 150 108 156 120 156"/></g></svg></div>
+<div class="corner bl"><svg viewBox="0 0 200 200" fill="none"><g stroke="#e6b422" stroke-width="1.6" opacity=".9"><path d="M8 8 L64 8 M8 8 L8 64"/><path d="M20 20 C60 24 68 30 70 70" /><path d="M20 34 C46 38 52 44 54 68"/><path d="M34 20 C38 46 44 52 68 54"/><circle cx="86" cy="86" r="10"/><circle cx="86" cy="86" r="4" fill="#e6b422"/><path d="M86 76 C96 62 112 58 126 64 C114 66 104 74 98 84"/><path d="M96 86 C110 76 126 76 138 84 C126 84 114 88 104 94"/><path d="M86 96 C96 110 112 114 126 108 C114 106 104 98 98 88"/><path d="M76 86 C62 96 60 112 66 126 C68 114 76 104 86 98"/><path d="M76 76 C62 66 46 66 34 74 C46 74 58 78 68 84"/><circle cx="150" cy="44" r="5"/><circle cx="152" cy="66" r="3"/><circle cx="44" cy="150" r="5"/><circle cx="66" cy="152" r="3"/><path d="M138 96 C150 100 156 108 156 120"/><path d="M96 138 C100 150 108 156 120 156"/></g></svg></div>
+<div class="corner br"><svg viewBox="0 0 200 200" fill="none"><g stroke="#e6b422" stroke-width="1.6" opacity=".9"><path d="M8 8 L64 8 M8 8 L8 64"/><path d="M20 20 C60 24 68 30 70 70" /><path d="M20 34 C46 38 52 44 54 68"/><path d="M34 20 C38 46 44 52 68 54"/><circle cx="86" cy="86" r="10"/><circle cx="86" cy="86" r="4" fill="#e6b422"/><path d="M86 76 C96 62 112 58 126 64 C114 66 104 74 98 84"/><path d="M96 86 C110 76 126 76 138 84 C126 84 114 88 104 94"/><path d="M86 96 C96 110 112 114 126 108 C114 106 104 98 98 88"/><path d="M76 86 C62 96 60 112 66 126 C68 114 76 104 86 98"/><path d="M76 76 C62 66 46 66 34 74 C46 74 58 78 68 84"/><circle cx="150" cy="44" r="5"/><circle cx="152" cy="66" r="3"/><circle cx="44" cy="150" r="5"/><circle cx="66" cy="152" r="3"/><path d="M138 96 C150 100 156 108 156 120"/><path d="M96 138 C100 150 108 156 120 156"/></g></svg></div>
+
+<header>
+  <div class="hpai">码 上 开 饭</div>
+  <div class="fu-row">
+    <div class="fu small"><span>春</span></div>
+    <div class="fu"><span>福</span></div>
+    <div class="fu small"><span>吉</span></div>
+  </div>
+  <h1 class="title">程序员年夜饭</h1>
+  <div class="subtitle">以代码之名 · 赴一场红红火火的团圆饭</div>
+  <div class="commit"><span class="p">$</span> git commit -m <span class="m">"祝新年 bug 全消，胃口常开 🧨"</span><span class="cursor"></span></div>
+  <div class="stats">精选 <b id="stat-n">18</b> 道好菜 · <b>6</b> 大类别 · 菜谱来自 GitHub 80k+ Star 的《程序员在家做饭指南》</div>
+</header>
+
+<nav class="cats" id="cats"></nav>
+
+<main><div class="grid" id="grid"></div></main>
+
+<footer>
+  <div class="big">阖家团圆 · 过年好</div>
+  菜谱数据来自开源项目 <a href="https://github.com/Anduin2017/HowToCook" target="_blank" rel="noopener">HowToCook · 程序员在家做饭指南</a><br>
+  用爱发电，过年吃好 · 祝各位开发者新春快乐，码到成功 🧧
+</footer>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+
+<script>
+const DATA = [{"name": "糖醋排骨", "title": "糖醋排骨", "category": "硬菜荤菜", "tag": "甜甜蜜蜜", "emoji": "🍖", "difficulty": 4, "calorie": "1022 大卡", "intro": "糖醋排骨是一道酸甜可口、外酥里嫩的传统名菜，广受欢迎。排骨富含优质蛋白和钙质，有较好的滋补效果。这道菜涉及焯水、油炸、炒糖色和收汁等多个步骤，对火候和调味有一定要求，不算特别适合新手，但按照优化后的流程操作成功率较高。预计制作时长为 大约 45 分钟。", "ingredients": ["排骨", "白砂糖", "食用油", "生抽", "蚝油", "老抽", "鸡精", "姜片", "芝麻", "番茄酱", "香醋", "五香粉"], "calc": {"note": "每份：", "items": ["排骨 300 g", "白砂糖 30 g", "食用油 300–350 ml  （油量需根据锅具大小调整，如用于深炸则以足以覆盖排骨 2/3 为准）", "生抽 5 ml", "蚝油 5 ml", "老抽 5 ml", "鸡精 2 g", "姜片 2 片", "芝麻 2 g", "番茄酱 10 g", "香醋 5 ml", "五香粉 0.5 g"]}, "steps": [{"title": "制作过程", "steps": [{"text": "排骨与姜片放入冷水中，大火加热至水沸腾、出现大量泡沫后转中火，待水持续沸腾时再转小火焯水 2–3 分钟，捞出备用。", "subs": null}, {"text": "用开水反复清洗排骨 2–3 遍，确保彻底去除血沫。", "subs": null}, {"text": "在锅中倒入足够量的食用油进行深炸（油量依据锅具大小而定，建议约 300 ml 供一般家庭使用），待油温升至约 170°C 后，下排骨炸制 3–5 分钟，直至表面略呈金黄色，捞出控油。", "subs": null}, {"text": "另取干净锅，置于小火上加热 50 ml 热水，加入白砂糖 30 g，轻轻搅拌直至糖完全溶解，并略呈淡黄色。此步骤的重点在于观察糖溶解情况，无需过分依赖颜色变化。", "subs": null}, {"text": "将炸好的排骨倒入炒制糖水的锅中，迅速翻炒 30 秒后，依次加入香醋 5 ml、生抽 5 ml、蚝油 5 ml、鸡精 2 g、番茄酱 10 g、五香粉 0.5 g，再次翻炒 30 秒，使调料均匀裹覆排骨，然后加入开水至刚好没过排骨。", "subs": null}, {"text": "用大火将锅中液体煮沸后，加入老抽 5 ml 进行上色，并快速收汁；若排骨块较大，可转小火焖煮 5–10 分钟以便更好地入味，切勿采用中火长时间炖煮 20 分钟，以免损伤口感。", "subs": null}, {"text": "起锅装盘，撒上芝麻 2 g，即可享用。", "subs": null}]}], "tips": ["炸排骨时可根据实际情况轻撒少量干淀粉于排骨表面，以提升酥脆口感。", "焯水时注意火力变化：冷水下锅后先用大火至水沸腾、泡沫丰富，再转中火，最后转小火焯水；焯水后应使用开水清洗，避免因温差过大导致肉质变柴。", "步骤四的关键在于确保白糖完全溶解，无须过分依赖颜色变化判断。", "收汁时应快速翻炒，使排骨均匀裹上调料，避免长时间煮炖造成口感损失。"], "images": ["images/糖醋排骨_0.jpg", "images/糖醋排骨_1.jpg"], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/meat_dish/%E7%B3%96%E9%86%8B%E6%8E%92%E9%AA%A8/%E7%B3%96%E9%86%8B%E6%8E%92%E9%AA%A8.md"}, {"name": "宫保鸡丁", "title": "宫保鸡丁", "category": "硬菜荤菜", "tag": "大吉大利", "emoji": "🐔", "difficulty": 4, "calorie": "1790 大卡", "intro": "这道川味名菜以糊辣荔枝味见长，小酸甜中透着干辣椒与花椒的香气，鸡丁嫩滑、花生酥脆，口感层次丰富。富含优质蛋白和不饱和脂肪酸，开胃下饭。做法分成简易和进阶两版，对新手比较友好，提前规划好腌制时间即可。从备料到出锅大约需要 1.5 小时。", "ingredients": ["手枪腿（或者鸡胸脯肉）", "大葱", "干辣椒（或者二荆条）", "熟花生", "生抽酱油", "香醋", "白糖", "料酒", "盐", "鸡精", "淀粉", "植物油", "芝麻油", "油泼辣子", "莴笋", "生花生", "豆瓣酱"], "calc": {"note": "注意，这道菜默认一人版本，两人也够吃，理论上多人只需简单加倍即可。 使用上述条件，计算出计划使用的原材料比例，依口味调整。", "items": ["必须配料", "进阶配料", "可选配料"]}, "steps": [{"title": "简易版本", "steps": [{"text": "手枪腿用剪刀去骨，鸡肉面用刀背拍打一遍，切条后切至 1.5cm 见方肉丁；泡于清水 10 分钟，捞出控干备用（若是鸡胸脯肉，则可以直接进行切丁以及之后的动作）", "subs": null}, {"text": "取大葱葱绿与姜片 5g 于碗中，倒入 50g 开水备用；葱白切 1.5cm 圆粒备用；取花生放入微波炉高火 5 分钟焙干备用", "subs": null}, {"text": "鸡丁中加入盐 2g，老抽酱油 5g，料酒 15g，淀粉 15g 搅拌均匀，至微微发干；缓慢加入部分葱姜水，搅拌鸡丁至粘手；保鲜膜密封，放入冰箱腌制 1 小时", "subs": null}, {"text": "干辣椒切段；起锅，大火烧热转小火；放入干辣椒焙干至微微发糊，捞起备用；花椒焙干至有香味，捞起备用", "subs": null}, {"text": "转大火，倒入 20g 植物油，7 成热（竹筷子起泡）下入鸡丁，煎至上面开始发白，用锅铲翻面，煎 30s 后翻炒均匀", "subs": null}, {"text": "下入葱粒翻炒，加入余下葱姜水不够 100g 再加一点清水（务必是热水）；盖上锅盖，转中小火焖 2 分钟；", "subs": null}, {"text": "转大火，下入熟花生，干辣椒和花椒；加入鸡精 2g，香醋 5g，白糖 2g，翻炒均匀；", "subs": null}, {"text": "淀粉 10g 加 50g 清水调成水淀粉，加入锅中，翻炒均匀，收汁到自己想要的浓度", "subs": null}, {"text": "关火，淋入芝麻油 10g，即可出锅", "subs": null}]}, {"title": "稍加复杂但是更加令人垂涎欲滴的版本", "steps": [{"text": "莴笋去皮切至 1cm 见方的小块，备用；", "subs": null}, {"text": "二荆条切成 1cm 长段；", "subs": null}, {"text": "手枪腿用剪刀去骨，鸡肉面用刀背拍打一遍，切条后切至 1.5cm 见方肉丁；泡于清水 10 分钟，捞出控干备用（若是鸡胸脯肉，则可以直接进行切丁以及之后的动作）；", "subs": null}, {"text": "取大葱葱绿与姜片 5g 于碗中，倒入 50g 开水备用；葱白切 1.5cm 圆粒备用", "subs": null}, {"text": "鸡丁中加入盐 2g，老抽酱油 5g，料酒 15g，淀粉 15g 搅拌均匀，至微微发干；缓慢加入部分葱姜水，搅拌鸡丁至粘手；保鲜膜密封，放入冰箱腌制 1 小时", "subs": null}, {"text": "转中火，倒入 20g 植物油，放入生花生翻炒至其表面微微焦糊，捞起花生但是油留在锅内；", "subs": null}, {"text": "继续加热，7 成热（竹筷子起泡）下入鸡丁，放入豆瓣酱，翻炒大概 1 分钟；", "subs": null}, {"text": "加入备好的莴笋丁，继续翻炒 1 分钟；", "subs": null}, {"text": "下入葱粒翻炒，加入余下葱姜水不够 100g 再加一点清水（务必是热水）；加入二荆条段；盖上锅盖，转中小火焖 2 分钟；", "subs": null}, {"text": "转大火，下入先前捞起来备用的花生，花椒；加入鸡精 2g，香醋 5g，白糖 2g，翻炒均匀；", "subs": null}, {"text": "淀粉 10g 加 50g 清水调成水淀粉，加入锅中，翻炒均匀，收汁到自己想要的浓度", "subs": null}, {"text": "关火，淋入芝麻油 10g 与油泼辣子 5g 再翻炒 10s，即可出锅", "subs": null}]}], "tips": ["辣椒依据个人口味酌量添加，怕辣可去籽；"], "images": ["images/宫保鸡丁_0.jpg"], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/meat_dish/%E5%AE%AB%E4%BF%9D%E9%B8%A1%E4%B8%81/%E5%AE%AB%E4%BF%9D%E9%B8%A1%E4%B8%81.md"}, {"name": "可乐鸡翅", "title": "可乐鸡翅", "category": "硬菜荤菜", "tag": "展翅高飞", "emoji": "🍗", "difficulty": 3, "calorie": "960 大卡", "intro": "可乐鸡翅色泽红亮、口感嫩滑，味道咸甜适口，是一道流行于家庭餐桌的创意菜肴。鸡翅富含优质蛋白质与脂肪，搭配可乐烹煮后肉质更为软烂。制作过程需要掌握煎制与收汁的火候，对新手有一定挑战，但跟随步骤仍可成功。从备料到完成大约耗时 40 分钟。", "ingredients": ["鸡翅中", "可乐", "白糖", "生抽", "盐", "生姜", "料酒或啤酒", "小葱"], "calc": {"note": "按照 1 盘的份量：", "items": ["鸡翅 10 ～ 12 只", "可乐 500ml", "白糖 10 克", "生抽 15 克", "老抽 3 克", "盐 2 克", "生姜 2 片", "料酒 20 毫升", "小葱挽成结"]}, "steps": [{"title": "制作过程", "steps": [{"text": "鸡翅入锅，倒入冷水淹没。放生姜 1 片和料酒 10 ～ 20 毫升。大火煮开（ 大约 2 分钟 ）后，撇去浮沫，沥出水分", "subs": ["这一步针对冰鲜鸡翅，刚买来的鸡翅直接改刀用生抽进行腌制即可。"]}, {"text": "捞出鸡翅，可用刀将两边各划上两口改刀。生抽约 10 克腌制鸡翅 10 分钟（生抽能完全包裹鸡翅表面入味就行）", "subs": null}, {"text": "锅重新小火起油，先将剩余姜片爆香，然后下入腌好的鸡翅。将鸡翅煎至金黄翻面（直到两面金黄），用炒菜勺子翻动一下鸡翅，与姜片一起翻炒 4～5 下（目的是防止鸡翅和姜片粘黏）。", "subs": null}, {"text": "鸡翅金黄，倒入可乐没过鸡翅，开大火将锅中可乐煮沸，然后撇去漂浮的黑色浮沫（包含血水）。此时加入葱结。", "subs": null}, {"text": "调味：加入食用盐 2 克，白糖 10 克，生抽 3 克调味（可以适当用老抽调底色，3 克）。", "subs": null}, {"text": "等到葱结变黄，和姜片一起捞出，转中火继续慢煮可乐鸡翅。", "subs": null}, {"text": "等到可乐呈现挂丝状态，关小火让汁牢牢挂在鸡翅上。出锅，装盘。", "subs": null}]}], "tips": ["加入生姜爆香的同时能防止鸡翅粘锅。", "最后收汁时勿开过大火，防止味道偏苦。", "本菜品偏甜。"], "images": [], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/meat_dish/%E5%8F%AF%E4%B9%90%E9%B8%A1%E7%BF%85.md"}, {"name": "梅菜扣肉", "title": "梅菜扣肉", "category": "硬菜荤菜", "tag": "鸿运当头", "emoji": "🥘", "difficulty": 4, "calorie": "3756 大卡", "intro": "这是一道客家传统名菜，成菜酱红油亮、汤汁黏稠，扣肉肥而不腻、软烂醇香。五花肉富含优质蛋白和脂肪酸，搭配梅干菜能提供膳食纤维。整体工序稍多，需要掌握煮、炸、蒸的火候，对新手有一定挑战。从备料到出锅，连同浸泡梅菜的时间在内，大约需要 2.5 小时。", "ingredients": ["五花肉", "梅菜", "五香粉", "食用油", "白砂糖", "老抽", "生抽", "小米椒", "蒜末", "食用盐", "鸡精"], "calc": {"note": "每份：", "items": ["五花肉 200 g", "梅菜 30 g", "五香粉 2 g", "食用油 300 ml", "白砂糖 5 g", "老抽  30 ml", "生抽  20 ml", "小米椒  1 个", "蒜末 10 g", "食用盐 2 g", "鸡精 2 g"]}, "steps": [{"title": "制作过程", "steps": [{"text": "梅菜放到清水中，浸泡 1 小时", "subs": null}, {"text": "锅中倒入 50 ml 食用油，将整个五花肉猪皮朝下，放到锅中 1 分钟 ，取出挂掉猪皮 【可选】", "subs": null}, {"text": "锅中加入开水，放入五花肉，大火煮 20 分钟 （筷子可以插进五花肉），取出五花肉", "subs": null}, {"text": "在五花肉表面涂抹均匀老抽、五香粉、白砂糖，放置 15 分钟", "subs": null}, {"text": "起锅烧油，加入五花肉，中火油炸直至两面金黄色（3-5 分钟）", "subs": null}, {"text": "起锅烧油，倒入梅菜，加上小米椒、蒜蓉、鸡精、食用盐后翻炒，直至炒干梅干菜水分", "subs": null}, {"text": "五花肉切片（后端 0.5-1 cm）,放在大碗中，散上梅干菜", "subs": null}, {"text": "中火蒸 45 分钟", "subs": null}, {"text": "拿个盘子倒盖在五花肉大碗中，将五花肉倒在盘子中", "subs": null}]}], "tips": ["制作过程中发现，脆皮五花肉真香 Orz~", "不喜欢吃甜的可以去掉白砂糖，不影响主流程", "倒数第二个步骤，可以根据个人喜好调整时间", "炒干梅干菜的作用是为了后续吸油（盲猜）"], "images": ["images/梅菜扣肉_0.jpg", "images/梅菜扣肉_1.jpg"], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/meat_dish/%E6%A2%85%E8%8F%9C%E6%89%A3%E8%82%89/%E6%A2%85%E8%8F%9C%E6%89%A3%E8%82%89.md"}, {"name": "红烧猪蹄", "title": "红烧猪蹄", "category": "硬菜荤菜", "tag": "发财就手", "emoji": "🐷", "difficulty": 4, "calorie": "639 大卡", "intro": "红烧猪蹄是一道汤汁浓郁、肉质软糯的经典家常菜，咸香甜美，极为下饭。猪蹄富含胶原蛋白和蛋白质，营养丰富。这道菜对新手有一定挑战，但借助高压锅可以简化流程，有一定烹饪基础更易上手。从备料到完成大约需要 1 小时。", "ingredients": ["猪蹄", "香叶", "姜", "葱", "老抽", "桂皮", "冰糖", "料酒", "生抽", "盐", "八角", "食用油"], "calc": {"note": "一份正好够 3-4 人吃。", "items": ["猪蹄：2~3 根", "食用油：30ml", "香叶 2 片", "姜 5 片", "葱半根", "桂皮 1 块", "冰糖 7-8 粒", "料酒 30 ml", "生抽 20 ml", "老抽 20 ml", "盐 8 克", "八角 4 个"]}, "steps": [{"title": "开始制作", "steps": [{"text": "冷水锅中放入热心摊主剁好的猪蹄，加入 20 ml 料酒与葱姜，煮 15 分钟去掉血腥", "subs": null}, {"text": "热锅冷油，倒入 30ml 食用油，放入 7-8 粒冰糖，开小火，熬成糖色，期间用锅铲把冰糖压碎，大概熬 2 分钟", "subs": null}, {"text": "熬成糖色后，放入焯过水的猪蹄，继续小火，翻炒猪蹄，直至所有猪蹄两面微黄", "subs": null}, {"text": "加入香叶 2 片、桂皮 1 块、八角 4 个、生抽 20 ml、老抽 20 ml、料酒 10 ml、姜 3 片、盐 8 克，转中火、继续翻炒 1 分钟", "subs": null}, {"text": "加入开水或者冷水，水需要没过猪蹄，盖上锅盖，大火烧开，烧开之后关火", "subs": null}, {"text": "把锅内的食材全部倒入高压锅中，高压锅中需要 15 分钟（如果同学没有高压锅，可放在锅中大火转小火熬制即可）", "subs": null}, {"text": "15 分钟之后，把高压锅的食材倒入炒锅中，开大火收汁，此时可用筷子尝下味道、淡的话可以加 2~3g 盐", "subs": null}, {"text": "大火收汁时长根据锅中的水来算，一般 30 秒即可，多留点也无碍、红烧猪蹄汤也是很下饭的", "subs": null}]}], "tips": [], "images": ["images/红烧猪蹄_0.jpg"], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/meat_dish/%E7%BA%A2%E7%83%A7%E7%8C%AA%E8%B9%84/%E7%BA%A2%E7%83%A7%E7%8C%AA%E8%B9%84.md"}, {"name": "清蒸鲈鱼", "title": "清蒸鲈鱼", "category": "海鲜水产", "tag": "年年有余", "emoji": "🐟", "difficulty": 3, "calorie": "385 大卡", "intro": "清蒸鲈鱼是一道粤式经典蒸菜，鱼肉细嫩爽滑，味道清淡鲜美，能最大程度保留鲈鱼的原汁原味。鲈鱼富含优质蛋白和 DHA，营养丰富且易于消化。这道菜操作简单，对新手非常友好，从备料到出锅大约只需三十分钟。", "ingredients": ["鲈鱼（害怕杀鱼的同学可以让店家帮忙杀）", "香葱", "姜", "食用油", "蒸鱼豉油", "料酒", "食用盐"], "calc": {"note": "每份：", "items": ["鲈鱼 一条", "香葱 三根", "姜  一块", "食用油 10-15ml", "蒸鱼豉油 10-15ml", "料酒 10-15ml", "食用盐 5-10g"]}, "steps": [{"title": "制作过程", "steps": [{"text": "姜切片切丝、香葱的葱白切段，葱绿切丝，切丝后放入冷水浸泡备用。", "subs": null}, {"text": "鲈鱼处理好后洗净，用厨房纸擦干，两面分别划几刀，用盐洗掉鱼身的粘液，并用 10g 盐抹遍鱼身的内外，腌制 10 分钟以上。", "subs": null}, {"text": "补充一个鲈鱼改刀和摆盘的方法，改刀后可以让鲈鱼立起来蒸，均匀受热，同时吃起来更加方便，无需翻面。", "subs": null}, {"text": "鱼肚内塞上姜和葱白，鱼身也撒上姜和葱白，量为备用的一半。蒸鱼的碟子用筷子将鱼跟碟子隔开蒸", "subs": null}, {"text": "水烧热感觉到水温后放进入鱼", "subs": null}, {"text": "大火清蒸 10 分钟。", "subs": null}, {"text": "蒸好的鱼，用干净的盘子装起来并去除身上姜蒜", "subs": null}, {"text": "鱼身浇上 15ml 蒸鱼豉油", "subs": null}, {"text": "鱼身重新撒上姜和葱丝，锅内加上 10ml 食用油并烧热，将食用油淋至鱼身即可出菜", "subs": null}]}], "tips": ["技术总结："], "images": ["images/清蒸鲈鱼_0.jpg", "images/清蒸鲈鱼_1.jpg"], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/aquatic/%E6%B8%85%E8%92%B8%E9%B2%88%E9%B1%BC/%E6%B8%85%E8%92%B8%E9%B2%88%E9%B1%BC.md"}, {"name": "油焖大虾", "title": "油焖大虾", "category": "海鲜水产", "tag": "笑口常开", "emoji": "🦐", "difficulty": 4, "calorie": "584 大卡", "intro": "这道鲁菜经典以咸甜交融的酱汁包裹整虾，成菜红亮油润，虾肉紧实弹嫩。虾本身富含优质蛋白与虾青素，脂肪含量低，是补充营养又不易增加负担的食材。制作时需要炼葱油、剪虾、焖烧、收汁，对火候和调味把握有一定要求，更适合有基础的厨友尝试，全程大约需要 40 分钟。", "ingredients": ["黑虎虾 or 明虾、", "葱、姜", "料酒、盐、冰糖、植物油"], "calc": {"note": "1 人食用的版本。", "items": ["虾 10 只", "花椒 5g", "葱 50g", "姜 20g", "黄酒 30g", "盐 3g", "冰糖 10g", "植物油"]}, "steps": [{"title": "制作过程", "steps": [{"text": "剪虾枪到根上，虾须虾爪都剪掉，沙包挑掉，开背虾线挑出来，洗净备用", "subs": null}, {"text": "炸料油", "subs": ["油温三成热放花椒，油热离火，放葱姜（不要让油变色最好）葱稍微变黄沥油 （葱油弄多了可以留着作为拌面使用）。"]}, {"text": "下油，虾摆放整齐，两面变色后轻轻摁虾头", "subs": ["放姜米（姜切成细颗粒）", "黄酒 30g", "水两小碗", "盐 3g", "冰糖 10 克"]}, {"text": "大火烧开转小火盖盖子闷（中途不能再加汤水，不要开盖）", "subs": null}, {"text": "皮亮虾弯就可以起锅，虾摆盘", "subs": null}, {"text": "收汁（过滤后倒回锅里收浓，放葱油 ） 汤汁剩余 1/4 时。", "subs": null}, {"text": "浇汁", "subs": null}, {"text": "完成", "subs": null}, {"text": "开吃✅", "subs": null}]}], "tips": ["做法参考：B 站老饭骨视频从小吃到大的油焖大虾居然是假的？泰斗级大师还原真·味道"], "images": ["images/油焖大虾_0.jpg"], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/aquatic/%E6%B2%B9%E7%84%96%E5%A4%A7%E8%99%BE/%E6%B2%B9%E7%84%96%E5%A4%A7%E8%99%BE.md"}, {"name": "蒜蓉西兰花", "title": "蒜蓉西兰花", "category": "素菜时蔬", "tag": "健康平安", "emoji": "🥦", "difficulty": 2, "calorie": "187 大卡", "intro": "这道家常蔬菜以蒜香浓郁、调味简单见长，西兰花焯水后软嫩或微脆，清淡鲜美。富含维生素 C、膳食纤维和多种抗氧化物质，是营养均衡的快手素菜。制作过程不难，新手也能轻松掌握，从备料到出锅一般约 15 分钟即可完成。", "ingredients": ["西兰花 1 个", "大蒜 3-4 瓣", "生抽", "蚝油", "白糖"], "calc": {"note": "每次制作前需要确定计划做几份。一份正好够 2 个人吃。 每份：", "items": ["西兰花 约 200 g （约 1/2 中等大小的西兰花）", "大蒜 3-4 瓣", "生抽 10 ml", "蚝油 5 ml", "白糖 2 g"]}, "steps": [{"title": "制作过程", "steps": [{"text": "将 西兰花 切成小朵，清洗干净。", "subs": null}, {"text": "将 大蒜 去皮，切成蒜末，备用。", "subs": null}, {"text": "锅中加入 1000 ml 饮用水，大火烧开。", "subs": null}, {"text": "放入 西兰花，保持大火 煮 2-3 分钟，至 西兰花 颜色变翠绿，口感变软。", "subs": null}, {"text": "将 煮好的 西兰花 捞出，沥干水分，摆入盘中，备用。", "subs": null}, {"text": "热锅，加入 10 ml 食用油。油温升高后，放入 大蒜末，小火煸炒出香味。", "subs": null}, {"text": "加入 10 ml 生抽，5 ml 蚝油，2 g 白糖，加入 30 ml 饮用水。", "subs": null}, {"text": "将锅中汤汁烧开。", "subs": null}, {"text": "将烧好的蒜蓉汁 均匀淋在盘中的 西兰花 上。", "subs": null}]}], "tips": ["焯水时间不宜超过推荐时长，以免影响西兰花的口感和营养。", "如果想保留西兰花更脆的口感，可以缩短焯水时间。"], "images": [], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/vegetable_dish/%E8%92%9C%E8%93%89%E8%A5%BF%E5%85%B0%E8%8A%B1.md"}, {"name": "松仁玉米", "title": "松仁玉米", "category": "素菜时蔬", "tag": "金玉满堂", "emoji": "🌽", "difficulty": 2, "calorie": "580 大卡", "intro": "松仁玉米是一道口感清甜脆嫩的家常快手菜，松仁香酥、玉米甜润，属于广受欢迎的北方家常风味。玉米和松仁搭配，能提供丰富的膳食纤维、不饱和脂肪酸和多种维生素，营养均衡。做法简单，新手也能轻松驾驭，从备料到出锅一般只需大约十五 分钟。", "ingredients": ["玉米粒（建议使用甜玉米）", "熟松子仁", "胡萝卜（可选，增加色彩）", "食用油", "白砂糖", "盐", "淀粉", "水"], "calc": {"note": "每份：", "items": ["玉米粒 200 g（可用罐头甜玉米，也可自备煮熟）", "熟松子仁 30 g", "胡萝卜 50 g（切小丁，可省略）", "食用油 15 ml", "白砂糖 10 g", "盐 1 g", "淀粉 5 g", "水 20 ml（用于调淀粉水）"]}, "steps": [{"title": "制作过程", "steps": [{"text": "玉米粒和胡萝卜丁提前焯水 1 分钟，捞出沥干备用", "subs": null}, {"text": "热锅凉油，放入胡萝卜丁略炒，再加入玉米粒翻炒", "subs": null}, {"text": "加入白砂糖和盐，炒匀", "subs": null}, {"text": "混合水与淀粉成水淀粉，倒入锅中快速翻炒使汤汁略稠", "subs": null}, {"text": "加入熟松仁翻炒均匀", "subs": null}, {"text": "出锅装盘", "subs": null}]}], "tips": ["松仁可以提前用小火干炒至微微金黄香脆，更加美味", "使用罐头玉米时应先沥干水分，避免炒制过程中出水过多", "炒制时火候不宜过大，以防糊锅或松仁焦糊"], "images": [], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/vegetable_dish/%E6%9D%BE%E4%BB%81%E7%8E%89%E7%B1%B3.md"}, {"name": "西红柿炒鸡蛋", "title": "西红柿炒鸡蛋", "category": "素菜时蔬", "tag": "花开富贵", "emoji": "🍅", "difficulty": 2, "calorie": "252 大卡", "intro": "一道酸甜开胃的家常菜肴，嫩滑的鸡蛋裹着软烂多汁的西红柿，是中国家庭餐桌上的经典味道。鸡蛋提供优质蛋白质，西红柿富含维生素 C 和番茄红素，营养均衡好吸收。步骤简单，原材料易得，特别适合厨房新手入门，从头备菜到盛盘出锅大约只需 15 分钟。", "ingredients": ["西红柿", "鸡蛋", "食用油", "盐", "糖（可选）", "葱花（可选）"], "calc": {"note": "每次制作前需要确定计划做几份。一份正好够 1 个人食用 总量：", "items": ["西红柿 = 1 个（约 180g） * 份数", "鸡蛋 = 1.5 个 * 份数，向上取整", "食用油 = 4ml * 鸡蛋/个", "盐 = 1.5-2g * 份数", "糖 = 0-2g * 份数", "葱花 = 0-10g * 份数"]}, "steps": [{"title": "制作过程", "steps": [{"text": "西红柿洗净", "subs": null}, {"text": "可选：去掉西红柿的外表皮", "subs": ["开水烫表皮，然后将西红柿放入冷水，剥去外皮"]}, {"text": "西红柿去蒂，切成边长不超过 4cm 的小块，即为 西红柿块", "subs": null}, {"text": "将鸡蛋打入碗中，加入 1g * 份数 的盐，搅匀，即为 鸡蛋液", "subs": ["可以考虑向鸡蛋中加入 1ml 醋，这可以去除腥味，令鸡蛋更蓬松"]}, {"text": "热锅，加入食用油", "subs": null}, {"text": "油热后，倒入 鸡蛋液。翻炒至鸡蛋结为固体且颜色微微发黄，即为 半熟鸡蛋", "subs": null}, {"text": "关火。将 半熟鸡蛋 盛盘，重新开火", "subs": ["注意：不要洗锅"]}, {"text": "加入 西红柿块，锅铲拍打并翻炒 20 秒，或至西红柿软烂", "subs": null}, {"text": "向锅中加入 半熟鸡蛋，翻炒均匀", "subs": ["可以考虑加入 10ml 番茄酱和 50ml 清水，增加汤汁", "可以额外加入一些其它熟肉和材料"]}, {"text": "加入剩余的盐、糖（可选，如果倾向于甜味版本）、葱花（可选），翻炒均匀", "subs": null}, {"text": "关火，盛盘", "subs": null}]}], "tips": ["快速做法：", "加入盐 改为 “加入两滴生抽”", "这道菜根据不同的口味偏好，存在诸多版本，包括且不限于："], "images": [], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/vegetable_dish/%E8%A5%BF%E7%BA%A2%E6%9F%BF%E7%82%92%E9%B8%A1%E8%9B%8B.md"}, {"name": "酸辣土豆丝", "title": "酸辣土豆丝", "category": "素菜时蔬", "tag": "酸辣人生", "emoji": "🥔", "difficulty": 2, "calorie": "374 大卡", "intro": "酸辣开胃的经典家常菜，口感脆爽，色泽鲜亮，属于大众喜爱的快手小炒。土豆提供碳水化合物和钾元素，辣椒富含维生素 C，有助于增进食欲。操作步骤简单明了，对新手十分友好，从备料到出锅大约只需 20 分钟。", "ingredients": ["土豆", "大蒜", "青椒", "红椒", "干辣椒", "葱", "生抽", "陈醋", "盐"], "calc": {"note": "每份：", "items": ["土豆 240g（越细越长更好）", "大蒜 4 瓣", "青椒 0.5 个", "红椒 0.5 个", "干辣椒 3 个", "葱 1 根", "生抽 5ml", "陈醋 10ml", "盐 2g", "食用油 10-15ml"]}, "steps": [{"title": "制作过程", "steps": [{"text": "土豆去皮、切丝（或用刨丝器）。", "subs": null}, {"text": "切好的土豆丝用清水清洗，去除多余的淀粉，然后对土豆丝焯水 10 秒。沥干，备用。", "subs": null}, {"text": "葱切成葱花；大蒜拍碎切成蒜末（分为两等份备用）；干辣椒切小段；青红椒切丝。", "subs": null}, {"text": "热锅，小火热油，下入一半的葱花（葱白部分）、一半的蒜末和干辣椒爆香。", "subs": null}, {"text": "加入青红椒翻炒几下，加入土豆丝翻炒至变色。", "subs": null}, {"text": "加 5ml 生抽，10ml 陈醋，倒入剩下的一半蒜末和 2g 盐快速翻炒均匀。", "subs": null}, {"text": "出锅前撒上剩余的葱花，翻匀即可装盘。", "subs": null}]}], "tips": ["清洗土豆丝淀粉一定要去干净，不然会全黏在一起", "加入蒜末、盐后应尽快出锅，保留蒜香以及避免破坏口感。"], "images": [], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/vegetable_dish/%E9%85%B8%E8%BE%A3%E5%9C%9F%E8%B1%86%E4%B8%9D.md"}, {"name": "玉米排骨汤", "title": "玉米排骨汤", "category": "汤羹暖胃", "tag": "金汤聚福", "emoji": "🥣", "difficulty": 3, "calorie": "1724 大卡", "intro": "玉米排骨汤是一道鲜美清甜的家常汤品，排骨软烂，玉米和胡萝卜带来自然甜味。富含蛋白质、维生素和膳食纤维，营养均衡。做法简单，对新手友好，只需将排骨焯水煸香后慢炖约一小时即可完成。从备菜到出锅大约需要一个半小时。", "ingredients": ["排骨", "玉米", "胡箩卜", "生姜", "大葱", "食用油", "醋", "料酒", "黑胡椒粉", "食用盐", "砂锅（没有的话，用铁锅也行）"], "calc": {"note": "每份：", "items": ["排骨 500-800g", "玉米一根（喜欢吃玉米的可以多一根）", "胡萝卜一根（喜欢吃胡箩卜的可以多一根）", "大葱小半根", "香葱一根", "食用油 10 ml", "黑胡椒粉 4g", "料酒 10ml", "醋 10ml", "食用盐 10-15g（根据最后汤剩余的量而定）", "开水 1000 ml"]}, "steps": [{"title": "备菜", "steps": [{"text": "大葱切成 3-4cm 的大段，用刀背拍一下", "subs": null}, {"text": "玉米剁成小块", "subs": null}, {"text": "胡箩卜切成滚刀块", "subs": null}, {"text": "生姜去皮切大片", "subs": null}, {"text": "新鲜的排骨砍成小块", "subs": null}]}, {"title": "操作", "steps": [{"text": "排骨凉水下锅，放入大葱、生姜、料酒开始焯水，大火烧开，撇去浮沫，捞出排骨，沥干水分", "subs": null}, {"text": "热锅凉油，切大片的生姜和排骨一起下锅煸炒，待排骨表面微微焦黄，放入醋（可加速肉质软烂），继续煸炒一分钟", "subs": null}, {"text": "冲入开水，一次给足，之后就不要再加了，大火烧开", "subs": null}, {"text": "先下入玉米，放入胡椒粉，盖盖小火炖二十分钟，然后放入胡萝卜，盖盖继续小火炖四十分钟", "subs": null}, {"text": "调味很简单，出锅前三分钟，除了盐什么都不用放，最后撒上一把小葱花即可", "subs": null}]}], "tips": ["这道菜制作起来并不难，而且食材简单，对新手友好，适合降温的时候来上一大碗。"], "images": ["images/玉米排骨汤_0.jpg"], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/soup/%E7%8E%89%E7%B1%B3%E6%8E%92%E9%AA%A8%E6%B1%A4/%E7%8E%89%E7%B1%B3%E6%8E%92%E9%AA%A8%E6%B1%A4.md"}, {"name": "生汆丸子汤", "title": "生汆丸子汤", "category": "汤羹暖胃", "tag": "团团圆圆", "emoji": "🥣", "difficulty": 4, "calorie": "857 大卡", "intro": "生汆丸子汤口感鲜嫩弹滑，是一道原汁原味的家常汤品。猪肉提供优质蛋白质，搭配木耳、黄花等食材，营养较为均衡。制作中需要自己剁肉并掌握挤丸子的火候，稍有些门槛，更适合有一定基础的厨艺爱好者。从备料到上桌大约需要 1 小时。", "ingredients": ["前腿肉", "盐", "胡椒粉", "葱姜花椒水", "一个鸡蛋的鸡蛋清", "土豆淀粉", "熟豆油", "木耳", "黄花", "小香葱", "泡好的粉丝（放碗底）", "盐", "鸡粉", "胡椒粉", "香油", "香菜"], "calc": {"note": "每份：", "items": ["盐量 = 猪肉斤数 * 6 克", "胡椒粉量 = 猪肉斤数 * 2 克", "土豆淀粉 = 多少人的用量 * 40 克，本教程以一人用量算"]}, "steps": [{"title": "剁肉", "steps": [{"text": "肉改刀切开，肥瘦三七分", "subs": null}, {"text": "上刀剁一剁，用刀背砸一砸，把肉筋打开打松疏", "subs": null}, {"text": "剁一剁，砸一砸，剁成肉末，要想好吃得自己剁，机器打的太黏糊了", "subs": null}]}, {"title": "调味", "steps": [{"text": "每斤肉，6 克盐，1 克胡椒粉", "subs": null}, {"text": "上手抓匀", "subs": null}, {"text": "葱姜花椒水分次加，边加边搅，用手揉匀，让肉吸饱水。每斤肉末 80 克葱姜花椒水", "subs": null}, {"text": "放入鸡蛋清，继续顺着一个方向搅", "subs": null}, {"text": "加入 40 克土豆淀粉，搅匀", "subs": null}, {"text": "加入熟豆油，这是为了保持其嫩滑弹的状态", "subs": null}]}, {"title": "汆丸子", "steps": [{"text": "起锅烧水，烧开，改小火，似开非开的样子", "subs": null}, {"text": "上手，挤丸子，", "subs": null}, {"text": "全部漂起来，用小火煮 1 分钟", "subs": null}]}, {"title": "制作丸子汤", "steps": [{"text": "粉丝放碗底", "subs": null}, {"text": "加木耳，黄花，小香葱并用盐、胡椒粉、鸡粉打底调味", "subs": null}, {"text": "连汤带丸子冲如碗中", "subs": null}, {"text": "淋 3-5 滴香油", "subs": null}, {"text": "加一小颗香菜", "subs": null}]}], "tips": ["辣椒油可以根据口味放", "参考来自：生汆丸子汤，吃的就是一个鲜、嫩、弹，学会打丸子的这些技巧，这碗汤才地道"], "images": [], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/soup/%E7%94%9F%E6%B1%86%E4%B8%B8%E5%AD%90%E6%B1%A4.md"}, {"name": "手工水饺", "title": "手工水饺", "category": "主食点心", "tag": "招财进宝", "emoji": "🥟", "difficulty": 5, "calorie": "1313 大卡", "intro": "手工水饺是一道中式经典主食，皮薄馅大、鲜美多汁，饱腹又可以根据个人口味随意调味。猪肉馅提供优质蛋白质和脂肪，搭配韭菜还能补充维生素与膳食纤维。这道菜品对新手来说难度较高，需要掌握和面、擀皮、调馅和煮饺的火候，预计制作时间约 3 小时。", "ingredients": ["擀面杖", "面粉", "冷水", "直径 30cm 以上的盆", "芝麻香油"], "calc": {"note": "-单人，约 20 只 每份：", "items": ["面粉 200g", "冷水 150ml", "芝麻香油 2-3ml", "瘦肉末 250g", "肥肉末 20g 不喜可不加", "姜 3g", "葱 15g", "盐 3g", "蚝油 2ml", "香油 2ml", "生抽 2ml", "鸡蛋 1 个"]}, "steps": [{"title": "制作饺子皮", "steps": [{"text": "盆中加入所有面粉", "subs": null}, {"text": "加入芝麻香油", "subs": null}, {"text": "面粉中央挖小洞", "subs": null}, {"text": "分 4-5 次加入水，并搅和，当出现碎末状的稍微干燥面团时", "subs": null}, {"text": "取消加水，用手将面团压实", "subs": null}, {"text": "面团压实至可把盆周围的面粉纳入即可，此步骤为面光盆光", "subs": null}, {"text": "将面团置于桌上，盆倒扣于桌上，环境温度为 25 度，使面团醒发约 45 分钟", "subs": null}, {"text": "醒发完成后，将面团搓成条状，合成一团，再次搓成条，重复 3 次", "subs": null}, {"text": "擀成条状，切成 20 份均匀大小面团，并搓成直径约 3-3.5cm 的球状", "subs": null}, {"text": "压扁面团，在手上，桌上，擀面杖上，及面团上撒上面粉，此步骤防止面团发粘", "subs": null}, {"text": "用擀面杖将面团擀平，约 8cm 直径，厚约 2mm，中间略微比四周厚 1mm", "subs": null}]}, {"title": "拌馅", "steps": [{"text": "猪肉去皮，保留部分肥肉,切成小块", "subs": null}, {"text": "菜刀（建议两把）将猪肉剁成肉沫，放入碗中", "subs": null}, {"text": "葱、姜切成末，放入肉碗中搅拌均匀", "subs": null}, {"text": "韭菜洗净，切短至 3mm 以下长度", "subs": null}, {"text": "韭菜和肉沫混合，加入蚝油、生抽、香油各 2ml，加入一个鸡蛋的蛋清，用手混合搅拌均匀", "subs": null}, {"text": "放置 30 分钟即可开始包饺子", "subs": null}]}, {"title": "包饺子", "steps": [{"text": "左手上放面皮，放饺子馅一面尽量不要粘到面粉，防止无法合拢", "subs": null}, {"text": "右手用筷子夹约面皮 1/2 直径的馅", "subs": null}, {"text": "沿饺子皮圆周进行合拢，捏实，个人吃无需捏花，饺子皮不漏即可", "subs": null}]}, {"title": "煮饺子", "steps": [{"text": "使用可放下 20 只饺子的锅，或分批量煮", "subs": null}, {"text": "烧水，水约 3/4 锅的高度", "subs": null}, {"text": "大火烧开水后放入饺子，调至中火", "subs": null}, {"text": "第一次放入饺子，且水冒泡后，锅边加入 50ml 冷水（重复此步骤两次）", "subs": null}, {"text": "第三次水开后加入冷水 50ml，水开后调至小火等 60s 即可出锅", "subs": null}]}], "tips": ["煮水饺不需要盖锅盖，加三次水就是为了不让饺子一直处于沸腾状态导致表皮破损变成面片。", "黑醋 10ml", "姜 一小块 50 克", "香油 2 滴", "大蒜/蒜泥 3 瓣/人", "考虑搭配黑醋食用。建议用量：10-20ml。", "考虑姜切丝，在小碗加入 20ml 的黑醋与姜丝搅拌当蘸料，味道更丰富。", "考虑搭配黑醋时加入 1~3 滴香油，搅拌当蘸料。"], "images": [], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/staple/%E6%89%8B%E5%B7%A5%E6%B0%B4%E9%A5%BA.md"}, {"name": "炒年糕", "title": "炒年糕", "category": "主食点心", "tag": "步步高升", "emoji": "🍚", "difficulty": 3, "calorie": "960 大卡", "intro": "这是一道闽南风味的主食，年糕软糯弹牙，带着葱油的焦香，家常又饱腹。以米粉制成的年糕提供充足碳水化合物，搭配鸡蛋和青菜能补充蛋白质与维生素，营养均衡。做法简单，对新手友好，从准备到出锅大约需要 30 分钟。", "ingredients": ["年糕/白粿 （形状不限）", "葱", "调味料: 酱油，盐", "（可选）：鸡蛋，青菜"], "calc": {"note": "每次制作前需要确定计划做几份。一份正好够 1 个人食用 总量：", "items": ["年糕 250 g * 份数", "小葱 2 根 * 份数", "食用油 50 ml", "酱油 15 ml", "盐 1-2g * 份数，按口味喜好。"]}, "steps": [{"title": "制作过程", "steps": [{"text": "锅中加水烧开，煮熟年糕，碗中加水确保年糕不会粘连，捞起年糕备用。", "subs": null}, {"text": "小葱切葱花（将葱白和葱叶分开），青菜切小段备用。", "subs": null}, {"text": "（可选） 制作炒蛋，见西红柿炒蛋。", "subs": null}, {"text": "热锅，加入 30ml 食用油。", "subs": null}, {"text": "将葱白倒入锅中，直至大部分葱白变成焦黄色且发出香味，倒出葱油备用。", "subs": null}, {"text": "重新热锅，加入 20ml 食用油。", "subs": null}, {"text": "加入所有辅料（鸡蛋，青菜等），翻炒均匀。", "subs": null}, {"text": "将年糕的水倒掉，向锅中加入年糕。", "subs": null}, {"text": "加入酱油和盐，翻炒均匀。", "subs": null}, {"text": "关火，加入葱油，翻炒均匀，乘盘。", "subs": null}]}], "tips": ["辅料的选择可以根据个人选择酌情添加，如加入瘦肉等", "在煮年糕的时候注意搅拌，以免粘锅"], "images": [], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/staple/%E7%82%92%E5%B9%B4%E7%B3%95.md"}, {"name": "醪糟小汤圆", "title": "醪糟小汤圆", "category": "甜品饮品", "tag": "甜甜蜜蜜", "emoji": "🍡", "difficulty": 2, "calorie": "957 大卡", "intro": "醪糟小汤圆是一道香甜软糯的传统中式甜品，酒酿的微酸与糯米的绵滑交融，暖胃又舒心。它富含碳水化合物和少量 B 族维生素，能快速补充能量，也有助促进血液循环。做法毫无门槛，对新手特别友好，从烧水到出锅只需约 15 分钟，是一碗随时都能轻松完成的家常甜汤。", "ingredients": ["小汤圆", "醪糟", "白糖", "枸杞（可选）"], "calc": {"note": "每次制作前需要确定计划做几份。一份正好够 1-2 个人食用 总量：", "items": ["水 300 毫升 * 份数", "小汤圆 250 克 * 份数", "醪糟 50 克 * 份数", "枸杞 5 颗 * 份数", "白糖"]}, "steps": [{"title": "制作过程", "steps": [{"text": "将水倒入锅中并煮沸", "subs": null}, {"text": "放入小汤圆煮 8 分钟", "subs": null}, {"text": "放入醪糟和枸杞再煮 2 分钟", "subs": null}, {"text": "盛入碗中根据个人口味加入白糖并搅拌均匀", "subs": null}, {"text": "吃", "subs": null}]}], "tips": ["白糖的用量根据个人口味更改", "若喜欢更浓的口感可以减少 100 毫升内的水", "若喜欢软点的枸杞口感，可以将枸杞和小汤圆同时煮"], "images": [], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/staple/%E9%86%AA%E7%B3%9F%E5%B0%8F%E6%B1%A4%E5%9C%86.md"}, {"name": "酸梅汤", "title": "酸梅汤", "category": "甜品饮品", "tag": "酸甜如意", "emoji": "🍹", "difficulty": 2, "calorie": "359 大卡", "intro": "酸梅汤是一道酸甜可口、清凉解暑的传统饮品，冰镇后饮用尤为沁人心脾。配方中的乌梅、山楂、甘草等原料有助于生津止渴、消食开胃。做法简单，新手友好，只需浸泡、熬煮和冷藏即可。制作全程包括浸泡、两次煎煮和冷藏，大约需要 6 小时以上，建议提前准备。", "ingredients": ["水", "乌枣", "乌梅", "山楂片（生）", "黄冰糖", "甘草", "陈皮", "红豆蔻", "干桂花"], "calc": {"note": "上述所有用量可以等比例增加或减小。", "items": ["两升水", "乌枣 25 克", "乌梅 25g", "黄冰糖 100 克", "山楂片 30 克", "甘草 2 克", "陈皮 4 克", "红豆蔻 1 克", "干桂花 3 克"]}, "steps": [{"title": "制作过程", "steps": [{"text": "冲洗材料（干桂花和冰糖除外）， 1.5 升水常温浸泡两小时以上（干桂花和冰糖除外）", "subs": null}, {"text": "开中大火煮沸，盖盖，转小火煮 40 分钟，为头煎", "subs": null}, {"text": "将冰糖放入盆内，再将沥好用材的头汤趁热倒入，搅拌至冰糖融化。", "subs": null}, {"text": "药材重新装回锅内再 600 毫升的水，开大火煮沸，盖盖，转中火，再煮 20 分钟为二煎", "subs": null}, {"text": "最后将二煎和冰糖水趁热混合为成品。在成品 60-70℃加入干桂花（不要超过 80℃）加盖晾凉再放入冰箱冷藏 3 小时以上。", "subs": null}, {"text": "饮用时记得将干桂花沥出。如饮茶般细啜，冰凉振齿，酸醒人、甜适度，滋味丰满而悠长", "subs": null}]}], "tips": ["放入冰箱冷藏后再饮用效果更佳。"], "images": ["images/酸梅汤_0.jpg"], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/drink/%E9%85%B8%E6%A2%85%E6%B1%A4/%E9%85%B8%E6%A2%85%E6%B1%A4.md"}, {"name": "红烧肉", "title": "简易红烧肉", "category": "硬菜荤菜", "tag": "红红火火", "emoji": "🍖", "difficulty": 3, "calorie": "2775 大卡", "intro": "这道家常美味色泽红润油亮，口感软糯，肥而不腻，酱香浓郁，搭配米饭特别过瘾。五花肉提供优质蛋白质和必需脂肪酸，加上鹌鹑蛋或豆皮，营养更全面。做法对新手相当友好，从备料到出锅大约需要 1.5 小时。", "ingredients": ["注：如果有可能，请尽量把刀磨的锋利一些。", "主料：大肉、鸡蛋（可选）、豆皮（可选）", "辅料：生姜、冰糖、生抽、老抽、料酒、香叶、八角、盐、水、葱（记得要开水）"], "calc": {"note": "每次制作前需要确定计划做几份。一份正好够 2-3 个人吃。 如果只有 1 人食用，可以考虑食材减半。", "items": ["猪五花肉：约 3~4 斤", "姜： 6 片", "冰糖：15 克（约 7 块）", "生抽：10ml", "老抽：15ml", "料酒：5ml", "开水：没过食材的量，需要 600ml-900ml", "香叶：3 片", "八角：2 个", "鹌鹑蛋（可选，没有鹌鹑蛋，可以用同等重量的鸡蛋代替）：0-2 个", "豆皮（可选）：0-80g", "盐：2-3g"]}, "steps": [{"title": "原材料准备", "steps": [{"text": "猪五花肉切大块（约 4.5cm ，冷冻半小时至一小时更好切）", "subs": null}, {"text": "豆皮切 2cm 的宽度", "subs": null}, {"text": "生姜切片（每片厚度约 3mm ）", "subs": null}, {"text": "水烧开", "subs": null}, {"text": "鹌鹑蛋煮熟并用叉子/牙签扎孔（尽量多些好入味）", "subs": null}, {"text": "大葱大葱白色的部分葱白", "subs": null}]}, {"title": "开始制作", "steps": [{"text": "冷水锅中放入切好的猪五花肉，加入料酒与葱姜，煮 15 分钟去掉血腥", "subs": null}, {"text": "锅中放入两片生姜提味", "subs": null}, {"text": "开中小火后直接加入五花肉，不需要放入食用油，每块五花肉六个面都煎一下，煎至出油即可", "subs": null}, {"text": "将煎出的油倒出备用，并将五花肉推至一边，加入 15g 冰糖，翻炒至冰糖融化；", "subs": null}, {"text": "融化后将五花肉与冰糖炒至融合上色，加入", "subs": ["生抽 10ml", "老抽 15ml", "料酒 5ml", "翻炒至上色；"]}, {"text": "加入烧好的开水炖煮 40 分钟（刀工差的同学切的过大请自觉延长炖煮时间），并放入", "subs": ["生姜 2 片", "香叶 3 片", "八角 2 个"]}, {"text": "盖上锅盖煮至沸腾后，加入煮好扎好孔的鹌鹑蛋和豆皮，开中小火，等待 40 分钟。（中途可适当翻搅防止粘锅）；", "subs": null}, {"text": "打开锅盖，待汤汁快没有的时候开大火收汁（切记不可收干）；", "subs": null}, {"text": "加入 2-3g 盐，翻炒一下，就可以出锅了。", "subs": null}]}], "tips": [], "images": ["images/红烧肉_0.jpg", "images/红烧肉_1.jpg"], "repo": "https://github.com/Anduin2017/HowToCook/blob/master/dishes/meat_dish/%E7%BA%A2%E7%83%A7%E8%82%89/%E7%AE%80%E6%98%93%E7%BA%A2%E7%83%A7%E8%82%89.md"}];
+</script>
+
+<script>
+/* ---------- 灯笼 ---------- */
+(function(){
+  const chars = ["囍","春","福","吉","年"];
+  const poss  = [6, 26, 50, 74, 93];
+  const box = document.getElementById("lanterns");
+  chars.forEach((c,i)=>{
+    const el = document.createElement("div");
+    el.className = "lantern" + (i===2 ? " big":"");
+    el.style.left = poss[i] + "%";
+    el.style.animationDelay = (i*0.55) + "s";
+    el.style.animationDuration = (3.2 + i*0.4) + "s";
+    if(i%2===0) el.style.top = (10 + (i*7)%22) + "px";
+    el.innerHTML = '<div class="rope"></div><div class="cap"></div><div class="body"><span class="char">'+c+'</span></div><div class="cap-b"></div><div class="tassel"></div>';
+    box.appendChild(el);
+  });
+})();
+
+/* ---------- 分类 ---------- */
+const CATS = [
+  {k:"全部", icon:"🧨"}, {k:"硬菜荤菜", icon:"🍖"}, {k:"海鲜水产", icon:"🐟"},
+  {k:"素菜时蔬", icon:"🥬"}, {k:"汤羹暖胃", icon:"🍲"}, {k:"主食点心", icon:"🥟"}, {k:"甜品饮品", icon:"🍡"},
+];
+let curCat = "全部";
+
+function renderCats(){
+  const box = document.getElementById("cats");
+  box.innerHTML = "";
+  CATS.forEach(c=>{
+    const t = document.createElement("div");
+    t.className = "tab" + (c.k===curCat ? " active":"");
+    t.textContent = c.icon + " " + c.k;
+    t.onclick = ()=>{ curCat = c.k; renderCats(); renderGrid(); };
+    box.appendChild(t);
+  });
+  const lucky = document.createElement("div");
+  lucky.className = "tab lucky";
+  lucky.textContent = "🎲 手气上菜";
+  lucky.onclick = luckyDish;
+  box.appendChild(lucky);
+}
+
+function stars(n){ return "★".repeat(n) + "☆".repeat(Math.max(0,5-n)); }
+
+function renderGrid(){
+  const grid = document.getElementById("grid");
+  const list = DATA.filter(d=>curCat==="全部"||d.category===curCat);
+  grid.innerHTML = "";
+  list.forEach((d,i)=>{
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.animationDelay = (i*0.045) + "s";
+    card.onclick = ()=>openModal(d);
+    const pic = d.images.length
+      ? '<img loading="lazy" src="'+d.images[0]+'" alt="'+d.name+'">'
+      : '<div class="ph"><span>'+d.emoji+'</span></div>';
+    card.innerHTML =
+      '<div class="pic">'+pic+'<div class="badge">'+d.tag+'</div></div>'+
+      '<div class="body">'+
+        '<h3>'+d.name+'<span class="tag">'+d.tag+'</span></h3>'+
+        '<div class="intro">'+(d.intro||"")+'</div>'+
+        '<div class="meta"><span class="stars">'+stars(d.difficulty)+'</span>'+
+        (d.calorie?'<span>🔥 '+d.calorie+'</span>':'')+
+        '<span>'+d.category+'</span><span class="go">查看做法 →</span></div>'+
+      '</div>';
+    grid.appendChild(card);
+  });
+}
+
+function luckyDish(){
+  const d = DATA[Math.floor(Math.random()*DATA.length)];
+  curCat = "全部"; renderCats(); renderGrid();
+  requestAnimationFrame(()=>{
+    const cards = document.querySelectorAll(".card");
+    const idx = DATA.indexOf(d);
+    if(cards[idx]){ cards[idx].scrollIntoView({behavior:"smooth",block:"center"});
+      cards[idx].style.boxShadow = "0 0 0 3px #ffd700,0 18px 40px rgba(30,0,2,.6),0 0 40px rgba(255,190,0,.8)"; }
+    setTimeout(()=>openModal(d), 550);
+  });
+}
+
+/* ---------- Modal ---------- */
+const overlay = document.getElementById("overlay");
+const modalEl = document.getElementById("modal");
+
+function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function openModal(d){
+  const hero = d.images.length
+    ? '<img src="'+d.images[0]+'" alt="'+d.name+'">'
+    : '<div class="ph"><span>'+d.emoji+'</span></div>';
+
+  let ing = "";
+  if(d.ingredients.length){
+    ing = '<div class="sect"><div class="sect-h"><div class="n">备</div><h4>备料清单</h4><div class="line"></div></div>';
+    if(d.ingredients.length)
+      ing += '<div class="two-col">' + d.ingredients.map(x=>'<div class="ing"><span>'+esc(x)+'</span></div>').join("") + '</div>';
+    if(d.calc.items.length){
+      ing += '<div class="subg-h">精准用量（程序员就要可量化）</div>';
+      if(d.calc.note) ing += '<div class="calc-note">'+esc(d.calc.note)+'</div>';
+      ing += '<div class="two-col">' + d.calc.items.map(x=>'<div class="ing"><span>'+esc(x)+'</span></div>').join("") + '</div>';
+    }
+    ing += '</div>';
+  }
+
+  let steps = "";
+  if(d.steps.length){
+    steps = '<div class="sect"><div class="sect-h"><div class="n">烹</div><h4>开工步骤</h4><div class="line"></div></div>';
+    d.steps.forEach(g=>{
+      steps += '<div class="subg-h">'+esc(g.title)+'</div>';
+      g.steps.forEach((s,i)=>{
+        steps += '<div class="step"><div class="num">'+(i+1)+'</div><div class="txt">'+esc(s.text);
+        if(s.subs && s.subs.length)
+          steps += '<div class="subs">'+s.subs.map(x=>'<div>· '+esc(x)+'</div>').join("")+'</div>';
+        steps += '</div></div>';
+      });
+    });
+    steps += '</div>';
+  }
+
+  let tips = "";
+  if(d.tips.length){
+    tips = '<div class="sect"><div class="sect-h"><div class="n">诀</div><h4>大厨贴士</h4><div class="line"></div></div>'+
+      d.tips.map(t=>'<div class="tip-li"><span class="ic">💡</span><span>'+esc(t)+'</span></div>').join("") + '</div>';
+  }
+
+  modalEl.innerHTML =
+    '<div class="m-hero">'+hero+'<button class="m-close" onclick="closeModal()">✕</button>'+
+      '<div class="m-head"><h2>'+d.name+'</h2><span class="tag">'+d.tag+'</span></div></div>'+
+    '<div class="m-body">'+
+      '<div class="chips">'+
+        '<div class="chip">分类 · <b>'+d.category+'</b></div>'+
+        '<div class="chip">难度 <span class="stars">'+stars(d.difficulty)+'</span></div>'+
+        (d.calorie?'<div class="chip">热量 · <b>'+d.calorie+'</b></div>':'')+
+        (d.calc.note?'<div class="chip">份量 · <b>'+esc(d.calc.note).slice(0,18)+'</b></div>':'')+
+      '</div>'+
+      (d.intro?'<div class="intro-p">'+esc(d.intro)+'</div>':'')+
+      ing + steps + tips +
+      '<div class="m-foot"><div class="wish">—— '+d.tag+'，上菜！ ——</div>'+
+      '<a class="repo" href="'+d.repo+'" target="_blank" rel="noopener">📄 查看 GitHub 原始菜谱</a></div>'+
+    '</div>';
+
+  overlay.classList.add("show");
+  overlay.scrollTop = 0;
+  document.body.style.overflow = "hidden";
+}
+function closeModal(){
+  overlay.classList.remove("show");
+  document.body.style.overflow = "";
+}
+overlay.addEventListener("click", e=>{ if(e.target===overlay) closeModal(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
+
+/* ---------- 烟花 ---------- */
+(function(){
+  const cv = document.getElementById("fireworks");
+  const ctx = cv.getContext("2d");
+  let W,H; 
+  function fit(){ W=cv.width=innerWidth; H=cv.height=innerHeight; }
+  fit(); addEventListener("resize", fit);
+
+  const COLORS = ["#ffd700","#ff6b5e","#ff4757","#ffe9a0","#ff9f43","#f8a5c2","#fff5e6"];
+  let parts = [], rockets = [];
+
+  function launch(){
+    rockets.push({
+      x: W*0.12 + Math.random()*W*0.76,
+      y: H + 6,
+      vy: -(H*0.010 + Math.random()*H*0.004),
+      targetY: H*0.12 + Math.random()*H*0.3,
+      color: COLORS[Math.random()*COLORS.length|0]
+    });
+  }
+  function boom(x,y,color){
+    const n = 42 + (Math.random()*26|0);
+    for(let i=0;i<n;i++){
+      const a = Math.random()*Math.PI*2, sp = 1.2 + Math.random()*4.2;
+      parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+        life: 60+Math.random()*40, age:0,
+        color: Math.random()<.72 ? color : COLORS[Math.random()*COLORS.length|0],
+        size: 1.2+Math.random()*1.8});
+    }
+  }
+  function loop(){
+    ctx.clearRect(0,0,W,H);
+    ctx.globalCompositeOperation = "lighter";
+    // 上升火箭
+    for(let i=rockets.length-1;i>=0;i--){
+      const r = rockets[i];
+      r.y += r.vy;
+      ctx.beginPath();
+      ctx.strokeStyle = "#ffe9a0"; ctx.lineWidth = 2;
+      ctx.moveTo(r.x, r.y); ctx.lineTo(r.x, r.y - 14);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.fillStyle = r.color; ctx.arc(r.x, r.y, 2.4, 0, 7); ctx.fill();
+      if(r.y <= r.targetY){ boom(r.x, r.y, r.color); rockets.splice(i,1); }
+    }
+    // 爆炸粒子
+    for(let i=parts.length-1;i>=0;i--){
+      const p = parts[i];
+      p.age++;
+      p.x += p.vx; p.y += p.vy;
+      p.vy += 0.045; p.vx *= 0.985; p.vy *= 0.985;
+      const a = 1 - p.age/p.life;
+      if(a<=0){ parts.splice(i,1); continue; }
+      ctx.beginPath();
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.arc(p.x, p.y, p.size*(0.5+a*0.5), 0, 7);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+    requestAnimationFrame(loop);
+  }
+  // 定时燃放
+  setInterval(()=>{ if(document.visibilityState==="visible") launch(); }, 1300);
+  for(let i=0;i<3;i++) setTimeout(launch, 400+i*500);
+  loop();
+  // 页面失焦暂停密集燃放
+  document.addEventListener("visibilitychange", ()=>{ parts.length=0; rockets.length=0; });
+})();
+
+/* ---------- init ---------- */
+document.getElementById("stat-n").textContent = DATA.length;
+renderCats();
+renderGrid();
+</script>
+</body>
+</html>
