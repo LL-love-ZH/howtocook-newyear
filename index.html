@@ -739,11 +739,10 @@ const WEBP_OK = (function(){
 
 let imgActive = 0;
 const imgQueue = [];
-/* 运行时计数器（用于排查加载异常，代价极小） */
+/* 运行时计数器（便于线上排查图片加载异常，体积开销可忽略） */
 const IMG_STAT = {started:0, ok:0, fail:0, timeout:0, abort:0, enqueued:0};
-if(typeof window!=="undefined") window.__imgStat = IMG_STAT;
-/* 队列内部状态探针（排查用） */
 if(typeof window!=="undefined"){
+  window.__imgStat = IMG_STAT;
   window.__imgQueue = ()=>({active:imgActive, queued:imgQueue.length,
     speed:+imgScrollSpeed.toFixed(3), throttle:imgThrottle()});
 }
