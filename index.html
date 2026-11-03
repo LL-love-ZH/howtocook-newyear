@@ -745,7 +745,7 @@ const imgQueue = [];
 const IMG_STAT = {started:0, ok:0, fail:0, timeout:0, abort:0, enqueued:0};
 if(typeof window!=="undefined"){
   window.__imgStat = IMG_STAT;
-  window.__imgQueue = ()=>({active:imgActive, queued:imgQueue.length,
+  window.__imgQueue = ()=>({inFlight:imgInFlight, queued:imgQueue.length,
     speed:+imgScrollSpeed.toFixed(3), throttle:imgThrottle()});
 }
 
@@ -784,19 +784,23 @@ function imgThrottle(){
 if(typeof window!=="undefined"){
   window.addEventListener("scroll", imgTrackScroll, {passive:true});
 }
-/* 发射器：保证任意两次请求之间至少间隔 gap 毫秒 */
-let imgLastFireT = 0;
+/* 发射器：控制"发起速率"与"同时在飞数量"。
+   注意：原生 <img> 的请求由浏览器自己排队，我们的在途计数只用于限流，
+   不会因为某张图卡住就堵死整个队列（卡住的图由它自己的看门狗处理）。 */
+let imgLastFireT = 0, imgInFlight = 0;
 function imgPump(){
   const th = imgThrottle();
   const now = Date.now();
   const wait = imgLastFireT + th.gap - now;
   if(wait > 0){ imgSchedulePump(wait); return; }
   let fired = 0;
-  while(imgActive < th.conc && imgQueue.length && fired < th.conc){
+  while(imgInFlight < th.conc && imgQueue.length && fired < th.conc){
     const job = imgQueue.shift();
     fired++;
     imgLastFireT = Date.now();
-    job();          // 槽位由 imgAttempt 内部通过 imgHold 获取
+    imgInFlight++;
+    let settled = false;
+    job(()=>{ if(!settled){ settled = true; imgInFlight = Math.max(0, imgInFlight-1); imgPump(); } });
   }
   if(imgQueue.length) imgSchedulePump(Math.max(th.gap, 200));
 }
@@ -805,15 +809,6 @@ function imgSchedulePump(delay){
   if(imgPumpTimer) return;
   imgPumpTimer = setTimeout(()=>{ imgPumpTimer = null; imgPump(); }, delay);
 }
-function imgRelease(){
-  imgActive = Math.max(0, imgActive-1);
-  imgPump();
-}
-/* 槽位所有权：一次尝试持有一个槽位，结束时必须**恰好**释放一次。
-   用 st.held 标记，避免"超时释放后迟到回调又释放一次"导致并发超发
-   （那会让实际并发远超设定值，把 CDN 打挂）。 */
-function imgHold(st){ if(!st.held){ st.held = true; imgActive++; } }
-function imgUnhold(st){ if(st && st.held){ st.held = false; imgActive = Math.max(0, imgActive-1); imgPump(); } }
 /* 把图片排进队列尾部（不占用槽位，槽位在真正取出时才占） */
 function imgEnqueue(img, delay){
   const run = ()=>{
@@ -821,9 +816,9 @@ function imgEnqueue(img, delay){
     if(!img.isConnected) return;
     const st = imgState.get(img);
     if(!st || st.done || st.failed) return;
-    imgQueue.push(()=>{
-      if(!img.isConnected) return;
-      imgAttempt(img);
+    imgQueue.push((settle)=>{
+      if(!img.isConnected){ settle(); return; }
+      imgAttempt(img, settle);
     });
     imgPump();
   };
@@ -884,22 +879,26 @@ function imgFail(img){
   const pic = img.closest(".pic,.m-hero");
   if(pic){ pic.classList.remove("ok","loading"); pic.classList.add("err"); }
   img.style.display = "none";
-  imgUnhold(st);
+  if(st.settle) st.settle();
 }
 
 /* 发起一次加载尝试。
-   用 fetch + AbortController 而不是 img.src：
-   - 超时能真正 abort 掉挂起的请求，把 HTTP 连接归还浏览器连接池
-   - 不会因为 img.src="" 触发额外的 error 事件造成双路径竞态
-   - 并发上限才真正生效（HTTP/1.1 单域连接池通常只有 6 个） */
-function imgAttempt(img){
+   用浏览器原生 <img> 加载（而不是 fetch + blob URL）：
+   - 原生加载由浏览器自己管理连接池、HTTP 缓存与解码调度，比手工 fetch 稳得多
+   - 之前用 fetch+blob 中转时，网络请求和解码被串成一条链：
+     一旦 blob 解码卡住，队列就被阻塞，实测出现"并发 3 却有 22 个在飞"的堵塞
+   - 原生 <img> 的 loading="lazy" 也能让浏览器自行决定拉取时机
+   真正的并发/速率控制交给上面的节流器（imgThrottle + imgPump），
+   这里只负责"给这张图换一个候选 URL 并等它出结果"。
+
+   注意：原生 <img> 的请求由浏览器自己排队，我们这里的"槽位"只用于
+   **控制发起速率**（每秒最多发几个），不阻塞等待请求结束 ——
+   否则一张卡住的图会把整个队列堵死。 */
+function imgAttempt(img, settle){
   const st = imgState.get(img);
   if(!st || st.done || st.failed) return;
   if(st.cleanup) st.cleanup();
-
-  // 取得本次尝试的槽位（结束时由 imgUnhold 释放，且只释放一次）
-  // 弹窗大图是用户此刻正在看的那张，走独立通道，不占用队列槽位
-  if(!st.noSlot) imgHold(st);
+  st.settle = settle || null;
 
   // 上一次是超时 → 强制跳到下一轮，用带时间戳的新 URL 绕开 CDN 的坏缓存
   const forceNext = !!st.forceNext;
@@ -913,16 +912,16 @@ function imgAttempt(img){
   if(pic){ pic.classList.remove("err"); pic.classList.add("loading"); }
   img.style.display = "";
 
-  const ctrl = new AbortController();
   let timer = null;
   const cleanup = ()=>{
     if(timer){ clearTimeout(timer); timer = null; }
-    try{ ctrl.abort(); }catch(e){}
+    img.removeEventListener("load", onLoad);
+    img.removeEventListener("error", onError);
     if(st.cleanup === cleanup) st.cleanup = null;
   };
   st.cleanup = cleanup;
 
-  const finish = (ok, reason)=>{
+  const finish = (ok)=>{
     if(gen !== st.gen) return;          // 陈旧回调，忽略
     cleanup();
     if(ok){
@@ -931,50 +930,39 @@ function imgAttempt(img){
       img.classList.add("loaded");
       const p = img.closest(".pic,.m-hero");
       if(p){ p.classList.remove("loading","err"); p.classList.add("ok"); }
-      imgUnhold(st);
+      if(st.settle) st.settle();
     }else{
       IMG_STAT.fail++;
+      if(st.settle) st.settle();
       // 退避重试：避免网络瞬断时瞬间把所有重试打完
-      imgUnhold(st);
       imgEnqueue(img, Math.min(700 * st.si, 2500));
     }
   };
 
+  const onLoad = ()=>{
+    if(gen !== st.gen) return;
+    if(img.naturalWidth > 0) finish(true);
+    else finish(false);       // 加载完成但零尺寸（解码失败），也当失败处理
+  };
+  const onError = ()=>{
+    if(gen !== st.gen) return;
+    finish(false);
+  };
+  img.addEventListener("load", onLoad);
+  img.addEventListener("error", onError);
+  img.src = url;
+
+  // 看门狗：只做兜底，不主动打断正常请求。
+  // 超时后换下一个候选 URL（带时间戳绕 CDN 的坏缓存），并冷却后重试。
   timer = setTimeout(()=>{
     if(gen !== st.gen) return;
     if(img.complete && img.naturalWidth>0){ finish(true); return; }
-    // 超时 → abort 请求（连接立即归还池子），换下一个源重试
     IMG_STAT.timeout++;
-    st.forceNext = true;    // 下次尝试用带时间戳的新 URL，绕开 CDN 缓存的坏响应
+    st.forceNext = true;
     cleanup();
-    imgUnhold(st);
-    // 超时说明 CDN 当前压力过大 —— 立刻重排队会形成"打-挂-重试"死循环，
-    // 必须冷却一段时间，等 CDN 缓过来再试。
-    imgEnqueue(img, 3000 + Math.random()*4000);
+    if(st.settle) st.settle();
+    imgEnqueue(img, 1500 + Math.random()*2500);
   }, IMG_TIMEOUT);
-
-  fetch(url, {signal: ctrl.signal, cache:"default"})
-    .then(res=>{
-      if(!res.ok) throw new Error("HTTP "+res.status);
-      return res.blob();
-    })
-    .then(blob=>{
-      if(gen !== st.gen) return;
-      const objUrl = URL.createObjectURL(blob);
-      const prevUrl = img.dataset.objurl;
-      if(prevUrl) URL.revokeObjectURL(prevUrl);
-      img.dataset.objurl = objUrl;
-      img.src = objUrl;
-      // 等图片真正解码完成再算成功
-      const done = ()=>{ if(img.dataset.objurl===objUrl) URL.revokeObjectURL(objUrl); finish(true); };
-      if(img.complete && img.naturalWidth>0) done();
-      else img.addEventListener("load", done, {once:true});
-    })
-    .catch(err=>{
-      if(gen !== st.gen) return;
-      if(err && err.name === "AbortError"){ IMG_STAT.abort++; return; }
-      finish(false);
-    });
 }
 
 function imgLoad(img, force){
