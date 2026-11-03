@@ -720,8 +720,12 @@ function bindCards(){
      改用 fetch 后可以用 AbortController 真正 abort 掉挂起的请求，
      连接立即归还池子，并发上限才真正生效，失败也能立刻换源重试。 */
 const IMG_MAX_RETRY   = 4;      // 每个源的重试轮数（比原来多留一轮余量）
-const IMG_TIMEOUT     = 9000;   // 单次加载超时（毫秒）—— 实测成功请求中位 1.3s，9s 足够宽松
-const IMG_MAX_CONCURRENT = 4;   // 真实并发请求数上限（配合速率节流使用）
+const IMG_TIMEOUT     = 25000;  // 单次加载超时（毫秒）
+   /* 实测：即使串行 100ms 间隔请求，也有约 7% 的图片要 20 秒以上才响应
+      （GitHub Pages CDN 边缘节点在部分网络下极不稳定）。
+      超时设得太短会把"只是慢"的好图片误判为失败 —— 之前设 8~15 秒时
+      实测有 90% 的请求被误杀。25 秒能覆盖绝大多数情况。 */
+const IMG_MAX_CONCURRENT = 3;   // 真实并发请求数上限（配合速率节流使用）
 const imgState = new WeakMap();
 
 /* 浏览器是否支持 WebP（支持则优先用，体积约为 JPEG 的 60%） */
@@ -842,18 +846,21 @@ function imgUrls(st, attempt){
   }
   list.push(base);
   // 重试轮次加时间戳，绕过 CDN 缓存的坏响应
+  // （CDN 边缘节点会把坏响应缓存住，不换 URL 会一直拿到同一份坏数据）
   if(attempt > 1){
     const busted = u => u + (u.includes("?")?"&":"?") + "r=" + attempt + "_" + Date.now();
     return list.map(busted);
   }
   return list;
 }
-/* 推进到下一个候选源；返回 false 表示候选已全部用尽 */
-function imgNext(img){
+/* 推进到下一个候选源；返回 false 表示候选已全部用尽
+   forceNext=true 时直接跳到下一轮（带时间戳绕 CDN 坏缓存），
+   用于超时场景 —— 同一个 URL 拿到的还是那份坏响应，换 URL 才有用。 */
+function imgNext(img, forceNext){
   const st = imgState.get(img);
   if(!st) return false;
   const urls = imgUrls(st, st.round);
-  if(st.si >= urls.length){
+  if(forceNext || st.si >= urls.length){
     st.round++;
     st.si = 0;
     if(st.round > IMG_MAX_RETRY) return false;   // 彻底失败
@@ -881,7 +888,10 @@ function imgAttempt(img){
   if(!st || st.done || st.failed) return;
   if(st.cleanup) st.cleanup();
 
-  if(!imgNext(img)){ imgFail(img); return; }
+  // 上一次是超时 → 强制跳到下一轮，用带时间戳的新 URL 绕开 CDN 的坏缓存
+  const forceNext = !!st.forceNext;
+  st.forceNext = false;
+  if(!imgNext(img, forceNext)){ imgFail(img); return; }
   const urls = imgUrls(st, st.round);
   const url = urls[st.si++];
   const gen = ++st.gen;
@@ -922,11 +932,12 @@ function imgAttempt(img){
     if(img.complete && img.naturalWidth>0){ finish(true); return; }
     // 超时 → abort 请求（连接立即归还池子），换下一个源重试
     IMG_STAT.timeout++;
+    st.forceNext = true;    // 下次尝试用带时间戳的新 URL，绕开 CDN 缓存的坏响应
     cleanup();
     imgRelease();
     // 超时说明 CDN 当前压力过大 —— 立刻重排队会形成"打-挂-重试"死循环，
     // 必须冷却一段时间，等 CDN 缓过来再试。
-    imgEnqueue(img, 2000 + Math.random()*3000);
+    imgEnqueue(img, 3000 + Math.random()*4000);
   }, IMG_TIMEOUT);
 
   fetch(url, {signal: ctrl.signal, cache:"default"})
