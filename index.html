@@ -793,10 +793,9 @@ function imgPump(){
   let fired = 0;
   while(imgActive < th.conc && imgQueue.length && fired < th.conc){
     const job = imgQueue.shift();
-    imgActive++;
     fired++;
     imgLastFireT = Date.now();
-    job();
+    job();          // 槽位由 imgAttempt 内部通过 imgHold 获取
   }
   if(imgQueue.length) imgSchedulePump(Math.max(th.gap, 200));
 }
@@ -809,6 +808,11 @@ function imgRelease(){
   imgActive = Math.max(0, imgActive-1);
   imgPump();
 }
+/* 槽位所有权：一次尝试持有一个槽位，结束时必须**恰好**释放一次。
+   用 st.held 标记，避免"超时释放后迟到回调又释放一次"导致并发超发
+   （那会让实际并发远超设定值，把 CDN 打挂）。 */
+function imgHold(st){ if(!st.held){ st.held = true; imgActive++; } }
+function imgUnhold(st){ if(st && st.held){ st.held = false; imgActive = Math.max(0, imgActive-1); imgPump(); } }
 /* 把图片排进队列尾部（不占用槽位，槽位在真正取出时才占） */
 function imgEnqueue(img, delay){
   const run = ()=>{
@@ -817,14 +821,13 @@ function imgEnqueue(img, delay){
     const st = imgState.get(img);
     if(!st || st.done || st.failed) return;
     imgQueue.push(()=>{
-      if(!img.isConnected){ imgRelease(); return; }
+      if(!img.isConnected) return;
       imgAttempt(img);
     });
     imgPump();
   };
   if(delay) setTimeout(run, delay); else run();
 }
-
 /* 只有滚进视野附近才真正发起请求，避免一次性几十个请求把 CDN 打爆 */
 const imgObserver = ("IntersectionObserver" in window)
   ? new IntersectionObserver(entries=>{
@@ -880,7 +883,7 @@ function imgFail(img){
   const pic = img.closest(".pic,.m-hero");
   if(pic){ pic.classList.remove("ok","loading"); pic.classList.add("err"); }
   img.style.display = "none";
-  imgRelease();
+  imgUnhold(st);
 }
 
 /* 发起一次加载尝试。
@@ -892,6 +895,10 @@ function imgAttempt(img){
   const st = imgState.get(img);
   if(!st || st.done || st.failed) return;
   if(st.cleanup) st.cleanup();
+
+  // 取得本次尝试的槽位（结束时由 imgUnhold 释放，且只释放一次）
+  // 弹窗大图是用户此刻正在看的那张，走独立通道，不占用队列槽位
+  if(!st.noSlot) imgHold(st);
 
   // 上一次是超时 → 强制跳到下一轮，用带时间戳的新 URL 绕开 CDN 的坏缓存
   const forceNext = !!st.forceNext;
@@ -923,11 +930,11 @@ function imgAttempt(img){
       img.classList.add("loaded");
       const p = img.closest(".pic,.m-hero");
       if(p){ p.classList.remove("loading","err"); p.classList.add("ok"); }
-      imgRelease();
+      imgUnhold(st);
     }else{
       IMG_STAT.fail++;
       // 退避重试：避免网络瞬断时瞬间把所有重试打完
-      imgRelease();
+      imgUnhold(st);
       imgEnqueue(img, Math.min(700 * st.si, 2500));
     }
   };
@@ -939,7 +946,7 @@ function imgAttempt(img){
     IMG_STAT.timeout++;
     st.forceNext = true;    // 下次尝试用带时间戳的新 URL，绕开 CDN 缓存的坏响应
     cleanup();
-    imgRelease();
+    imgUnhold(st);
     // 超时说明 CDN 当前压力过大 —— 立刻重排队会形成"打-挂-重试"死循环，
     // 必须冷却一段时间，等 CDN 缓过来再试。
     imgEnqueue(img, 3000 + Math.random()*4000);
@@ -977,7 +984,7 @@ function imgLoad(img, force){
     return;
   }
   const st = prev || {si:0, round:1, timer:null, src:img.dataset.src||"", srcWebp:img.dataset.webp||"",
-                      done:false, failed:false, released:false, slot:false, gen:0, cleanup:null};
+                      done:false, failed:false, held:false, gen:0, cleanup:null, noSlot:false};
   st.src = img.dataset.src || st.src;
   st.srcWebp = img.dataset.webp || st.srcWebp;
   st.si = 0; st.round = 1; st.done = false; st.failed = false; st.gen++;
@@ -1018,7 +1025,8 @@ function bindImgRetry(root){
       } else {
         imgLoad(img, true);
       }
-      img.style.display = "";    };
+      img.style.display = "";
+    };
   });
 }
 
@@ -1033,9 +1041,9 @@ function heroHTML(d){
 function bindHero(){
   const img = detailModal.querySelector(".m-hero img[data-src]");
   if(img){
-    // 弹窗大图走高优先级通道：直接发起请求，不进并发队列
+    // 弹窗大图走高优先级通道：直接发起请求，不进并发队列，也不占槽位
     const st = {si:0, round:1, timer:null, src:img.dataset.src||"", srcWebp:img.dataset.webp||"",
-                done:false, failed:false, released:false, slot:false, gen:0, cleanup:null};
+                done:false, failed:false, held:false, gen:0, cleanup:null, noSlot:true};
     imgState.set(img, st);
     imgAttempt(img);
   }
