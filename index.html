@@ -692,10 +692,17 @@ function bindCards(){
      而 error 监听器又会 setTimeout(→imgAttempt) 重试 —— 于是同一张图同时走了
      "超时重试"和"错误重试"两条路，st.si/st.round 被双倍消耗，
      很快就把所有候选源打完，直接进入"彻底失败"降级状态。
-     现在改为：超时时用 abort 标记位屏蔽随之而来的 error 事件，单一路径推进。 */
+
+   ★ 最终改用 fetch + AbortController（不再用 img.src 直接加载）：
+     img.src 方式的超时只能"放弃等待"，无法真正中断请求 —— 挂起的连接仍占着
+     浏览器的连接池（HTTP/1.1 单域通常只允许 6 个并发连接！）。
+     实测线上滚动时 48 张图同时处于 loading 状态，远超我们设的 8 并发上限，
+     连接池被挂起请求占满 → 后续图片全部排队卡死 → 用户看到"图片时有时无"。
+     改用 fetch 后可以用 AbortController 真正 abort 掉挂起的请求，
+     连接立即归还池子，并发上限才真正生效，失败也能立刻换源重试。 */
 const IMG_MAX_RETRY   = 3;      // 每个源的重试轮数（比原来多留一轮余量）
 const IMG_TIMEOUT     = 15000;  // 单次加载超时（毫秒）—— 实测最慢成功请求 16s，取 15s 留余量
-const IMG_MAX_CONCURRENT = 8;   // 最大并发请求数（实测并发 8 成功率最高 97%）
+const IMG_MAX_CONCURRENT = 6;   // 真实并发请求数上限（HTTP/1.1 单域连接池约 6，必须 ≤6）
 const imgState = new WeakMap();
 
 /* 浏览器是否支持 WebP（支持则优先用，体积约为 JPEG 的 60%） */
@@ -720,15 +727,6 @@ function imgRelease(){
   imgActive = Math.max(0, imgActive-1);
   imgPump();
 }
-/* 每张图同一时刻最多占一个并发槽位，用 st.slot 保证"释放"不会重复执行 */
-function imgHoldSlot(img){
-  const st = imgState.get(img); if(!st) return false;
-  st.slot = true; return true;
-}
-function imgReleaseSlot(img){
-  const st = imgState.get(img); if(!st) return;
-  if(st.slot){ st.slot = false; imgRelease(); }
-}
 /* 把图片排进队列尾部（不占用槽位，槽位在真正取出时才占） */
 function imgEnqueue(img, delay){
   const run = ()=>{
@@ -736,7 +734,7 @@ function imgEnqueue(img, delay){
     const st = imgState.get(img);
     if(!st || st.done || st.failed) return;
     imgQueue.push(()=>{
-      if(!img.isConnected || !imgHoldSlot(img)){ imgRelease(); return; }
+      if(!img.isConnected){ imgRelease(); return; }
       imgAttempt(img);
     });
     imgPump();
@@ -795,12 +793,14 @@ function imgFail(img){
   const pic = img.closest(".pic,.m-hero");
   if(pic){ pic.classList.remove("ok","loading"); pic.classList.add("err"); }
   img.style.display = "none";
-  imgReleaseSlot(img);
+  imgRelease();
 }
 
-/* 发起一次加载尝试。st.si 记录当前源索引，st.round 记录重试轮数。
-   每次尝试挂自己的 load/error 监听（用完即摘），并用 st.gen 区分陈旧回调，
-   从根本上杜绝"超时重试"与"错误重试"两条路径同时推进造成的状态错乱。 */
+/* 发起一次加载尝试。
+   用 fetch + AbortController 而不是 img.src：
+   - 超时能真正 abort 掉挂起的请求，把 HTTP 连接归还浏览器连接池
+   - 不会因为 img.src="" 触发额外的 error 事件造成双路径竞态
+   - 并发上限才真正生效（HTTP/1.1 单域连接池通常只有 6 个） */
 function imgAttempt(img){
   const st = imgState.get(img);
   if(!st || st.done || st.failed) return;
@@ -815,45 +815,62 @@ function imgAttempt(img){
   if(pic){ pic.classList.remove("err"); pic.classList.add("loading"); }
   img.style.display = "";
 
+  const ctrl = new AbortController();
+  let timer = null;
   const cleanup = ()=>{
-    img.removeEventListener("load", onLoad);
-    img.removeEventListener("error", onError);
-    if(st.timer){ clearTimeout(st.timer); st.timer = null; }
+    if(timer){ clearTimeout(timer); timer = null; }
+    try{ ctrl.abort(); }catch(e){}
     if(st.cleanup === cleanup) st.cleanup = null;
   };
-  const onLoad = ()=>{
-    if(gen !== st.gen) return;          // 陈旧回调，忽略
-    cleanup();
-    st.done = true;
-    img.classList.add("loaded");
-    const p = img.closest(".pic,.m-hero");
-    if(p){ p.classList.remove("loading","err"); p.classList.add("ok"); }
-    imgReleaseSlot(img);
-  };
-  const onError = ()=>{
-    if(gen !== st.gen) return;          // 陈旧回调，忽略
-    cleanup();
-    // 退避重试：避免网络瞬断时瞬间把所有重试打完
-    imgReleaseSlot(img);
-    imgEnqueue(img, Math.min(700 * st.si, 2500));
-  };
   st.cleanup = cleanup;
-  img.addEventListener("load", onLoad);
-  img.addEventListener("error", onError);
-  img.src = url;
 
-  // 超时兜底：某些请求会一直挂着不报错（连接建立但数据不来）。
-  // 注意：这里**不能**再执行 img.src="" —— 那会额外派发一次 error，
-  // 让同一张图同时走"超时重试"和"错误重试"两条路，把候选源双倍消耗掉。
-  // 直接换 src 即可让浏览器取消旧请求，且只有 load/error 一条推进路径。
-  st.timer = setTimeout(()=>{
-    if(gen !== st.gen) return;
-    if(img.complete && img.naturalWidth>0) return;   // 其实已成功
+  const finish = (ok, reason)=>{
+    if(gen !== st.gen) return;          // 陈旧回调，忽略
     cleanup();
-    // 慢图不应长期霸占并发槽位：让出槽位、排到队尾，把通道让给其他图
-    imgReleaseSlot(img);
+    if(ok){
+      st.done = true;
+      img.classList.add("loaded");
+      const p = img.closest(".pic,.m-hero");
+      if(p){ p.classList.remove("loading","err"); p.classList.add("ok"); }
+      imgRelease();
+    }else{
+      // 退避重试：避免网络瞬断时瞬间把所有重试打完
+      imgRelease();
+      imgEnqueue(img, Math.min(700 * st.si, 2500));
+    }
+  };
+
+  timer = setTimeout(()=>{
+    if(gen !== st.gen) return;
+    if(img.complete && img.naturalWidth>0){ finish(true); return; }
+    // 超时 → abort 请求（连接立即归还池子），换下一个源重试
+    cleanup();
+    imgRelease();
     imgEnqueue(img, 0);
   }, IMG_TIMEOUT);
+
+  fetch(url, {signal: ctrl.signal, cache:"default"})
+    .then(res=>{
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      return res.blob();
+    })
+    .then(blob=>{
+      if(gen !== st.gen) return;
+      const objUrl = URL.createObjectURL(blob);
+      const prevUrl = img.dataset.objurl;
+      if(prevUrl) URL.revokeObjectURL(prevUrl);
+      img.dataset.objurl = objUrl;
+      img.src = objUrl;
+      // 等图片真正解码完成再算成功
+      const done = ()=>{ if(img.dataset.objurl===objUrl) URL.revokeObjectURL(objUrl); finish(true); };
+      if(img.complete && img.naturalWidth>0) done();
+      else img.addEventListener("load", done, {once:true});
+    })
+    .catch(err=>{
+      if(gen !== st.gen) return;
+      if(err && err.name === "AbortError") return;   // 已被新一轮尝试取消
+      finish(false);
+    });
 }
 
 function imgLoad(img, force){
@@ -867,7 +884,7 @@ function imgLoad(img, force){
                       done:false, failed:false, released:false, slot:false, gen:0, cleanup:null};
   st.src = img.dataset.src || st.src;
   st.srcWebp = img.dataset.webp || st.srcWebp;
-  st.si = 0; st.round = 1; st.done = false; st.failed = false; st.gen = 0;
+  st.si = 0; st.round = 1; st.done = false; st.failed = false; st.gen++;
   imgState.set(img, st);
 
   // 交给 IntersectionObserver：滚进视野附近才开始加载
@@ -905,8 +922,7 @@ function bindImgRetry(root){
       } else {
         imgLoad(img, true);
       }
-      img.style.display = "";
-    };
+      img.style.display = "";    };
   });
 }
 
