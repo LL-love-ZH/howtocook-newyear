@@ -719,12 +719,52 @@ const imgQueue = [];
 /* 运行时计数器（用于排查加载异常，代价极小） */
 const IMG_STAT = {started:0, ok:0, fail:0, timeout:0, abort:0, enqueued:0};
 if(typeof window!=="undefined") window.__imgStat = IMG_STAT;
+
+/* ---- 滚动速度自适应限流 ------------------------------------------------
+   实测（2026-11-03，线上 GitHub Pages CDN）：
+     - 慢速滚动（每屏停 3 秒）：26 张全部加载成功，0 超时
+     - 快速滚动（连续 25 屏不停）：175 张瞬间涌入，CDN 边缘节点被打满，
+       请求大面积挂起 → 90% 超时 → 用户看到"图片时有时无"
+   也就是说 CDN 并非不可靠，而是**扛不住突发流量**。
+   解决办法：监测滚动速度，滚得快就收紧并发（少发请求、慢发），
+   滚得慢/停下来就逐步放开并发。 */
+let imgLastScrollY = 0, imgLastScrollT = Date.now(), imgScrollSpeed = 0;
+function imgTrackScroll(){
+  const y = window.scrollY || 0;
+  const now = Date.now();
+  const dt = Math.max(1, now - imgLastScrollT);
+  imgScrollSpeed = Math.abs(y - imgLastScrollY) / dt;   // px/ms
+  imgLastScrollY = y; imgLastScrollT = now;
+}
+/* 依滚动速度给出当前允许的并发数（1 ~ IMG_MAX_CONCURRENT） */
+function imgConcurrency(){
+  if(imgScrollSpeed > 2.5) return 2;        // 快速滚动：几乎暂停新请求
+  if(imgScrollSpeed > 1.0) return 3;        // 中速滚动：收紧
+  if(imgScrollSpeed > 0.35) return 4;       // 轻滚：适度放开
+  return IMG_MAX_CONCURRENT;                // 静止：全开
+}
+if(typeof window!=="undefined"){
+  window.addEventListener("scroll", imgTrackScroll, {passive:true});
+}
 function imgPump(){
-  while(imgActive < IMG_MAX_CONCURRENT && imgQueue.length){
+  const limit = imgConcurrency();
+  while(imgActive < limit && imgQueue.length){
     const job = imgQueue.shift();
     imgActive++;
     job();
   }
+  imgEnsureHeartbeat();
+}
+/* 保底心跳：若所有在途请求都卡住（如被 CDN 限流），队列会停滞，
+   这里定期唤醒一次 pump，让排队中的图片有机会继续尝试。 */
+let imgHeartbeat = null;
+function imgEnsureHeartbeat(){
+  if(imgHeartbeat) return;
+  imgHeartbeat = setTimeout(()=>{
+    imgHeartbeat = null;
+    if(imgQueue.length && imgActive < imgConcurrency()) imgPump();
+    else if(imgQueue.length) imgEnsureHeartbeat();
+  }, 2000);
 }
 function imgRelease(){
   imgActive = Math.max(0, imgActive-1);
@@ -736,6 +776,7 @@ function imgEnqueue(img, delay){
     if(!img.isConnected) return;
     const st = imgState.get(img);
     if(!st || st.done || st.failed) return;
+    IMG_STAT.enqueued++;
     imgQueue.push(()=>{
       if(!img.isConnected){ imgRelease(); return; }
       imgAttempt(img);
@@ -853,7 +894,9 @@ function imgAttempt(img){
     IMG_STAT.timeout++;
     cleanup();
     imgRelease();
-    imgEnqueue(img, 0);
+    // 超时说明 CDN 当前压力过大 —— 立刻重排队会形成"打-挂-重试"死循环，
+    // 必须冷却一段时间，等 CDN 缓过来再试。
+    imgEnqueue(img, 2000 + Math.random()*3000);
   }, IMG_TIMEOUT);
 
   fetch(url, {signal: ctrl.signal, cache:"default"})
