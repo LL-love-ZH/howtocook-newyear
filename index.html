@@ -765,23 +765,37 @@ function imgTrackScroll(){
   imgScrollSpeed = Math.abs(y - imgLastScrollY) / dt;   // px/ms
   imgLastScrollY = y; imgLastScrollT = now;
 }
-/* 速度衰减：停止滚动后，速度值应随时间回落，否则会一直卡在"慢速档"。
-   没有这个衰减，用户滚完停下后图片仍按最低速率加载，体验很差。 */
+/* 速度衰减：停止滚动后，速度值应随空闲时长快速回落，
+   否则会一直卡在"慢速档"，用户滚完停下后图片仍按最低速率加载。
+   空闲超过 1 秒后，速度按指数快速衰减（1 秒内基本归零）。 */
 function imgDecaySpeed(){
   const idle = Date.now() - imgLastScrollT;
-  if(idle > 400) imgScrollSpeed *= 0.5;   // 每 2 秒衰减一半
+  if(idle > 1000) imgScrollSpeed = 0;
+  else if(idle > 400) imgScrollSpeed *= 0.6;
   if(imgScrollSpeed < 0.02) imgScrollSpeed = 0;
 }
-/* 依滚动速度给出的最小请求间隔（毫秒）与并发上限 */
+/* 依滚动速度给出的最小请求间隔（毫秒）与并发上限。
+   快速滚动时几乎暂停发图（gap 很大），等用户停下来再放开 ——
+   反正滚过去的图用户也来不及看，等停下来再加载体感最好。 */
 function imgThrottle(){
   imgDecaySpeed();
-  if(imgScrollSpeed > 2.5) return {gap:250, conc:2};
-  if(imgScrollSpeed > 1.0) return {gap:150, conc:3};
-  if(imgScrollSpeed > 0.35) return {gap:110, conc:4};
+  if(imgScrollSpeed > 1.2) return {gap:1200, conc:1};
+  if(imgScrollSpeed > 0.5) return {gap:600,  conc:2};
+  if(imgScrollSpeed > 0.2)  return {gap:250,  conc:3};
   return {gap:70, conc:IMG_MAX_CONCURRENT};
 }
 if(typeof window!=="undefined"){
   window.addEventListener("scroll", imgTrackScroll, {passive:true});
+  /* 滚动停下后立刻唤醒队列：此时速率限制已放开，
+     不该再等旧的慢速定时器（可能长达 1.2 秒）。 */
+  let imgScrollIdleT = null;
+  window.addEventListener("scroll", ()=>{
+    if(imgScrollIdleT) clearTimeout(imgScrollIdleT);
+    imgScrollIdleT = setTimeout(()=>{
+      imgScrollSpeed = 0;
+      if(imgQueue.length) imgPump();
+    }, 350);
+  }, {passive:true});
 }
 /* 发射器：控制"发起速率"与"同时在飞数量"。
    注意：原生 <img> 的请求由浏览器自己排队，我们的在途计数只用于限流，
@@ -805,9 +819,16 @@ function imgPump(){
 }
 let imgPumpTimer = null;
 function imgSchedulePump(delay){
-  if(imgPumpTimer) return;
-  imgPumpTimer = setTimeout(()=>{ imgPumpTimer = null; imgPump(); }, delay);
+  // 若已有定时器，只有当新要求更早时才重排 —— 滚动停下后 gap 变小，
+  // 必须能立刻放开速率，不能被旧的慢速定时器拖住。
+  if(imgPumpTimer){
+    if(delay >= imgPumpDelay) return;
+    clearTimeout(imgPumpTimer);
+  }
+  imgPumpDelay = delay;
+  imgPumpTimer = setTimeout(()=>{ imgPumpTimer = null; imgPumpDelay = 0; imgPump(); }, delay);
 }
+let imgPumpDelay = 0;
 /* 把图片排进队列尾部（不占用槽位，槽位在真正取出时才占） */
 function imgEnqueue(img, delay){
   const run = ()=>{
