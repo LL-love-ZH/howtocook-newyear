@@ -190,10 +190,20 @@ main{position:relative;z-index:5;max-width:1240px;margin:0 auto;padding:22px 22p
 .card:hover{transform:translateY(-7px);border-color:var(--gold-bright);
   box-shadow:0 16px 36px rgba(30,0,2,.6),0 0 24px rgba(255,180,60,.32)}
 .pic{position:relative;aspect-ratio:4/3;overflow:hidden;background:#5c0a0e}
-.pic img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s;opacity:0}
+.pic img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;display:block;
+  transition:transform .5s,opacity .45s;opacity:0}
 .pic img.loaded{opacity:1}
+.pic .ph{z-index:0}
+.pic.err .ph{display:flex}
+.pic .spin{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center}
+.pic .spin::before{content:"";width:30px;height:30px;border-radius:50%;border:3px solid rgba(255,215,0,.22);
+  border-top-color:var(--gold-bright);animation:spin .8s linear infinite}
+.pic.ok .spin,.pic.err .spin{display:none}
+.pic .retry{position:absolute;left:0;right:0;bottom:8px;z-index:3;text-align:center;font-size:11.5px;
+  color:#ffd9b0;opacity:0;pointer-events:none;transition:.2s}
+.pic.err .retry{opacity:1;pointer-events:auto;cursor:pointer}
 .card:hover .pic img{transform:scale(1.07)}
-.pic .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:70px;
+.pic .ph{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;font-size:70px;
   background:radial-gradient(circle at 30% 25%,rgba(255,200,120,.16),transparent 55%),
   repeating-radial-gradient(circle at 50% 60%,rgba(255,215,0,.05) 0 3px,transparent 3px 26px),
   linear-gradient(160deg,#a31621,#6d0f13)}
@@ -236,7 +246,16 @@ main{position:relative;z-index:5;max-width:1240px;margin:0 auto;padding:22px 22p
   box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 40px rgba(255,120,60,.18);animation:pop .32s cubic-bezier(.2,.8,.3,1.15) both}
 @keyframes pop{from{opacity:0;transform:translateY(26px) scale(.95)}to{opacity:1;transform:none}}
 .m-hero{position:relative;height:250px;overflow:hidden;background:#5c0a0e}
-.m-hero img{width:100%;height:100%;object-fit:cover}
+.m-hero img{position:relative;z-index:1;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .45s}
+.m-hero img.loaded{opacity:1}
+.m-hero .ph{z-index:0}
+.m-hero .spin{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center}
+.m-hero .spin::before{content:"";width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,215,0,.22);
+  border-top-color:var(--gold-bright);animation:spin .8s linear infinite}
+.m-hero.ok .spin,.m-hero.err .spin{display:none}
+.m-hero .retry{position:absolute;left:0;right:0;bottom:14px;z-index:3;text-align:center;font-size:12.5px;
+  color:#ffd9b0;opacity:0;pointer-events:none;transition:.2s}
+.m-hero.err .retry{opacity:1;pointer-events:auto;cursor:pointer}
 .m-hero .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:110px;
   background:repeating-radial-gradient(circle at 50% 65%,rgba(255,215,0,.06) 0 4px,transparent 4px 34px),
   linear-gradient(160deg,#96201f,#5c0a0e)}
@@ -604,8 +623,12 @@ function stars(n){ return "★".repeat(n)+"☆".repeat(Math.max(0,5-n)); }
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
 function cardHTML(d,i){
-  const pic=d.img?`<img loading="lazy" src="${d.img}" alt="${esc(d.name)}" onload="this.classList.add('loaded')">`
-                 :`<div class="ph"><span>${d.emoji}</span></div>`;
+  const pic=d.img
+    ? `<div class="ph"><span>${d.emoji}</span></div>
+       <div class="spin"></div>
+       <img loading="lazy" decoding="async" data-src="${d.img}" alt="${esc(d.name)}">
+       <div class="retry">图片没加载出来 · 点此重试</div>`
+    : `<div class="ph"><span>${d.emoji}</span></div>`;
   const q=menu[d.id]||0;
   return `<div class="card" data-id="${d.id}" style="animation-delay:${Math.min(i,24)*0.035}s">
     <div class="pic">${pic}<span class="cat">${d.cat}</span></div>
@@ -643,14 +666,159 @@ function bindCards(){
     if(c.dataset.bound) return; c.dataset.bound="1";
     c.onclick=e=>{ if(e.target.closest("[data-add]")) return; openDetail(c.dataset.id); };
   });
+  // 图片：JS 接管加载（失败自动重试 → 降级占位）
+  document.querySelectorAll(".pic img[data-src]").forEach(img=>{
+    if(img.dataset.loaded) return; img.dataset.loaded="1";
+    imgLoad(img);
+  });
+  bindImgRetry(document);
 }
 
-/* ================= 详情弹窗 ================= */
+/* ================= 图片加载管理（重试 / 超时 / 降级 / 并发限流） =================
+   GitHub Pages 的 CDN 边缘节点偶发不稳定：实测 175 张图里有 12 张会超时或断连，
+   最慢的一张卡了 78 秒。原来的写法（src 直连 + onload 加 class）遇到失败就永久白屏。
+   这里改为：JS 统一接管 → 失败自动重试（带时间戳绕缓存）→ 超时兜底 → 彻底失败降级为
+   emoji 占位 + 手动重试入口。同时限制并发数，避免几十个请求同时打 CDN 把它拖垮。 */
+const IMG_MAX_RETRY   = 3;      // 最多重试次数（首次加载不算）
+const IMG_TIMEOUT     = 12000;  // 单次加载超时（毫秒）
+const IMG_MAX_CONCURRENT = 6;   // 最大并发请求数
+const imgState = new WeakMap();
+
+let imgActive = 0;
+const imgQueue = [];
+function imgPump(){
+  while(imgActive < IMG_MAX_CONCURRENT && imgQueue.length){
+    const job = imgQueue.shift();
+    imgActive++;
+    job();
+  }
+}
+function imgRelease(){
+  imgActive = Math.max(0, imgActive-1);
+  imgPump();
+}
+
+/* 发起一次加载尝试。st.n 记录「已经尝试过的次数」，是唯一真相来源。 */
+function imgAttempt(img){
+  const st = imgState.get(img);
+  if(!st) return;
+  if(st.timer){ clearTimeout(st.timer); st.timer=null; }
+
+  if(st.n > IMG_MAX_RETRY){
+    // 彻底失败：降级为 emoji 占位 + 提示可手动重试
+    const pic = img.closest(".pic,.m-hero");
+    if(pic){ pic.classList.remove("ok","loading"); pic.classList.add("err"); }
+    img.style.display = "none";
+    st.done = true;
+    if(!st.released){ st.released=true; imgRelease(); }
+    return;
+  }
+
+  st.n++;   // 本次是第 n 次尝试
+  const pic = img.closest(".pic,.m-hero");
+  if(pic){ pic.classList.remove("err"); pic.classList.add("loading"); }
+  img.style.display = "";
+
+  // 第 1 次用原 URL；重试时加时间戳参数，绕过 CDN 缓存的坏响应
+  const bust = st.n===1 && !st.manual;
+  const url = bust
+    ? st.src
+    : st.src + (st.src.includes("?")?"&":"?") + "r=" + st.n + "_" + Date.now();
+  st.manual = false;
+  img.src = url;
+
+  // 超时兜底：某些请求会一直挂着不报错，必须自己判定失败
+  st.timer = setTimeout(()=>{
+    if(img.complete && img.naturalWidth>0) return;   // 其实已成功
+    imgAttempt(img);
+  }, IMG_TIMEOUT);
+}
+
+function imgLoad(img, force){
+  const prev = imgState.get(img);
+  if(prev && !force) return;
+  // 复用已有 state（手动重试时保留已修正的 n/src 等字段）
+  const st = prev || {n:0, timer:null, src:img.dataset.src||"", done:false, released:false};
+  st.src = img.dataset.src || st.src;
+  imgState.set(img, st);
+
+  // 监听器只绑一次，避免重试时重复触发
+  if(!img.dataset.imbound){
+    img.dataset.imbound="1";
+    img.addEventListener("load", ()=>{
+      const s = imgState.get(img); if(!s) return;
+      if(s.timer){ clearTimeout(s.timer); s.timer=null; }
+      img.classList.add("loaded");
+      const pic = img.closest(".pic,.m-hero");
+      if(pic){ pic.classList.remove("loading","err"); pic.classList.add("ok"); }
+      if(!s.released){ s.released=true; imgRelease(); }
+    });
+    img.addEventListener("error", ()=>{
+      const s = imgState.get(img); if(!s) return;
+      if(s.timer){ clearTimeout(s.timer); s.timer=null; }
+      // 退避重试：避免网络瞬断时瞬间把所有重试打完
+      const delay = Math.min(800 * s.n, 3000);
+      setTimeout(()=>imgAttempt(img), delay);
+    });
+  }
+
+  // 进入队列，等有空位再真正发起请求
+  imgQueue.push(()=>{
+    // 元素可能已被移除（切换分类重渲染），此时跳过并释放槽位
+    if(!img.isConnected){ imgRelease(); return; }
+    imgAttempt(img);
+  });
+  imgPump();
+}
+
+/* 手动重试：点击失败卡片上的提示条 */
+function bindImgRetry(root){
+  root.querySelectorAll(".pic .retry, .m-hero .retry").forEach(r=>{
+    if(r.dataset.bound) return; r.dataset.bound="1";
+    r.onclick = e=>{
+      e.stopPropagation();
+      const pic = r.closest(".pic,.m-hero");
+      const img = pic.querySelector("img[data-src]");
+      if(!img) return;
+      pic.classList.remove("err");
+      const st = imgState.get(img);
+      if(st){
+        if(st.timer){ clearTimeout(st.timer); st.timer=null; }
+        st.n = 0;          // 重新给满重试次数
+        st.released = false;
+        st.manual = true;  // 手动重试强制绕缓存
+        st.src = img.dataset.src;   // 用原始 URL 重新开始
+        // 手动重试立即发起，不再排队（用户正在等这张图）
+        // 该图之前已释放过槽位，这里补一个占用，避免并发数失衡
+        st.released = false;
+        imgActive++;
+        imgAttempt(img);
+      } else {
+        imgLoad(img, true);
+      }
+      img.style.display = "";
+    };
+  });
+}
+
+/* 详情弹窗大图同样走重试逻辑 */
+function heroHTML(d){
+  if(!d.img) return `<div class="ph"><span>${d.emoji}</span></div>`;
+  return `<div class="ph"><span>${d.emoji}</span></div>
+          <div class="spin"></div>
+          <img decoding="async" data-src="${d.img}" alt="${esc(d.name)}">
+          <div class="retry">图片没加载出来 · 点此重试</div>`;
+}
+function bindHero(){
+  const img = detailModal.querySelector(".m-hero img[data-src]");
+  if(img) imgLoad(img);
+  bindImgRetry(detailModal.querySelector(".m-hero"));
+}
 const detailOverlay=document.getElementById("detailOverlay");
 const detailModal=document.getElementById("detailModal");
 function openDetail(id){
   const d=dishById(id); if(!d) return;
-  const hero=d.img?`<img src="${d.img}" alt="${esc(d.name)}">`:`<div class="ph"><span>${d.emoji}</span></div>`;
+  const hero=heroHTML(d);
   let ing="";
   if(d.ingredients.length||d.calc.items.length){
     ing=`<div class="sect"><div class="sect-h"><div class="n">备</div><h4>备料清单</h4><div class="line"></div></div>`;
@@ -702,6 +870,7 @@ function openDetail(id){
   detailOverlay.classList.add("show");
   detailOverlay.scrollTop=0;
   document.body.style.overflow="hidden";
+  bindHero();
 }
 function closeDetail(){ detailOverlay.classList.remove("show"); document.body.style.overflow=""; }
 function toggleDish(id){
