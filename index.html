@@ -402,6 +402,92 @@ footer .big{font-family:var(--kai);font-size:21px;color:var(--gold-bright);lette
   padding:11px 22px;border-radius:999px;transition:.3s;box-shadow:0 8px 26px rgba(0,0,0,.5)}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
+/* ---------- 转盘定菜 ---------- */
+.wheel-cta-row{text-align:center;margin-top:18px}
+.wheel-cta{font-family:var(--kai);font-size:clamp(17px,3.4vw,21px);font-weight:700;letter-spacing:.12em;
+  color:var(--ink);background:linear-gradient(180deg,#ffe08a,#e6b422);border:2px solid var(--gold-bright);
+  padding:12px 30px;border-radius:999px;cursor:pointer;
+  box-shadow:0 8px 28px rgba(255,180,0,.42);transition:.22s;animation:wheelcta 2.6s ease-in-out infinite}
+.wheel-cta:hover{transform:translateY(-3px) scale(1.03);filter:brightness(1.06)}
+.wheel-cta:active{transform:scale(.97)}
+@keyframes wheelcta{0%,100%{box-shadow:0 8px 28px rgba(255,180,0,.42)}50%{box-shadow:0 8px 44px rgba(255,180,0,.75)}}
+.wheelbtn{flex:none;font-family:var(--kai);font-size:15px;letter-spacing:.06em;color:var(--gold-bright);
+  background:rgba(90,8,10,.5);border:1.5px solid rgba(230,180,34,.55);padding:7px 14px;border-radius:999px;
+  cursor:pointer;white-space:nowrap;transition:.2s}
+.wheelbtn:hover{border-color:var(--gold-bright);transform:translateY(-2px);background:rgba(120,12,16,.6)}
+.wheelbtn:active{transform:scale(.96)}
+@media (max-width:760px){.wheelbtn{font-size:13.5px;padding:7px 11px}}
+
+.wheel-ov{position:fixed;inset:0;z-index:52;display:none;align-items:center;justify-content:center;
+  background:rgba(30,0,2,.82);backdrop-filter:blur(6px);padding:20px 14px;overflow-y:auto}
+.wheel-ov.show{display:flex;animation:fadein .25s ease both}
+.wheel-panel{position:relative;width:min(520px,100%);text-align:center;
+  background:linear-gradient(170deg,#a31621,#5c0a0e 78%);border:2px solid rgba(255,215,0,.6);
+  border-radius:22px;padding:22px 18px 26px;
+  box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 40px rgba(255,120,60,.18);
+  animation:pop .32s cubic-bezier(.2,.8,.3,1.15) both}
+.wheel-title{font-family:var(--kai);font-size:clamp(24px,5vw,30px);color:var(--gold-bright);letter-spacing:.18em}
+.w-head{display:flex;align-items:center;gap:10px;padding:4px 2px 2px}
+.w-head h3{font-family:var(--kai);font-size:23px;color:var(--gold-bright);letter-spacing:.18em;white-space:nowrap}
+.w-head .hint{margin-left:auto;font-size:12.5px;color:#f0b78a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w-head .cs-close{flex:none}
+@media (max-width:520px){
+  .w-head h3{font-size:19px;letter-spacing:.1em}
+  .w-head .hint{display:none}
+  .w-head .cs-close{margin-left:auto}
+}
+.wr-sub{font-size:13.5px;color:#ffd9b0;letter-spacing:.06em}
+.wr-alt.wr-close{width:100%;margin-top:2px}
+.wheel-sub{font-size:13px;color:#f0b78a;margin:6px 0 14px;letter-spacing:.08em}
+.wheel-stage{position:relative;width:min(78vw,400px);margin:0 auto;aspect-ratio:1;
+  touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+#wheelCv{width:100%;height:100%;display:block;border-radius:50%;
+  filter:drop-shadow(0 14px 32px rgba(0,0,0,.5))}
+.wheel-pointer{position:absolute;left:50%;top:-6px;transform:translateX(-50%);z-index:3;width:0;height:0;
+  border-left:15px solid transparent;border-right:15px solid transparent;border-top:30px solid var(--gold-bright);
+  filter:drop-shadow(0 4px 6px rgba(0,0,0,.45))}
+.wheel-pointer::after{content:"";position:absolute;left:-9px;top:-34px;width:18px;height:18px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#ffe9a8,#c8922a);border:2px solid #8a5a00}
+.wheel-hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;
+  width:42%;aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;padding:10px;
+  background:radial-gradient(circle at 35% 28%,#8a1418,#4d080c 75%);
+  border:3px solid var(--gold-bright);box-shadow:0 0 26px rgba(255,190,0,.35),inset 0 0 18px rgba(0,0,0,.5);
+  pointer-events:none}
+.hub-name{font-family:var(--kai);font-size:clamp(15px,3.6vw,21px);color:var(--gold-bright);letter-spacing:.06em;
+  line-height:1.35;max-width:100%;word-break:break-all;text-shadow:0 2px 8px rgba(0,0,0,.6)}
+.wheel-start{margin-top:18px;font-family:var(--kai);font-size:20px;font-weight:700;letter-spacing:.22em;
+  color:var(--ink);background:linear-gradient(180deg,#ffe08a,#e6b422);border:2px solid var(--gold-bright);
+  padding:13px 46px;border-radius:999px;cursor:pointer;touch-action:none;
+  box-shadow:0 8px 26px rgba(255,180,0,.4);transition:.2s;user-select:none;-webkit-user-select:none}
+.wheel-start:hover{transform:translateY(-2px);filter:brightness(1.05)}
+.wheel-start:active{transform:scale(.96)}
+.wheel-start.spinning{background:linear-gradient(180deg,#f0a028,#c8722a);color:#fff5e6}
+.wheel-hint{margin-top:13px;font-size:12.5px;color:#e0a878;letter-spacing:.06em;line-height:1.8}
+
+.wheel-result{position:fixed;inset:0;z-index:54;display:none;align-items:center;justify-content:center;
+  background:rgba(30,0,2,.72);backdrop-filter:blur(5px);padding:18px}
+.wheel-result.show{display:flex;animation:fadein .25s ease both}
+.wr-card{width:min(380px,100%);text-align:center;padding:30px 22px 24px;border-radius:22px;
+  background:linear-gradient(170deg,#b01e28,#5c0a0e 78%);border:2.5px solid var(--gold-bright);
+  box-shadow:0 30px 80px rgba(0,0,0,.65),0 0 50px rgba(255,120,60,.3);
+  animation:pop .38s cubic-bezier(.2,.8,.3,1.15) both}
+.wr-burst{font-size:52px;line-height:1;animation:wrburst .8s ease both}
+@keyframes wrburst{0%{transform:scale(.3);opacity:0}60%{transform:scale(1.18)}100%{transform:scale(1);opacity:1}}
+.wr-cong{font-family:var(--kai);font-size:19px;color:#ffdca6;letter-spacing:.22em;margin-top:10px}
+.wr-name{font-family:var(--kai);font-size:clamp(30px,7vw,40px);color:var(--gold-bright);letter-spacing:.1em;
+  margin:10px 0 22px;text-shadow:0 3px 12px rgba(0,0,0,.6);word-break:break-all}
+.wr-acts{display:flex;flex-direction:column;gap:11px}
+.wr-main{font-family:var(--kai);font-size:18px;font-weight:700;letter-spacing:.14em;color:var(--ink);
+  background:linear-gradient(180deg,#ffe08a,#e6b422);border:2px solid var(--gold-bright);border-radius:999px;
+  padding:12px 20px;cursor:pointer;box-shadow:0 8px 24px rgba(255,180,0,.42);transition:.2s}
+.wr-main:hover{transform:translateY(-2px);filter:brightness(1.06)}
+.wr-row{display:flex;gap:11px}
+.wr-row .wr-alt{flex:1}
+.wr-alt{font-family:var(--kai);font-size:15.5px;letter-spacing:.1em;color:var(--gold);
+  background:rgba(70,5,7,.55);border:1.5px solid rgba(230,180,34,.55);border-radius:999px;
+  padding:11px 10px;cursor:pointer;transition:.2s}
+.wr-alt:hover{border-color:var(--gold-bright);color:var(--gold-bright)}
+
 ::-webkit-scrollbar{width:9px}
 ::-webkit-scrollbar-track{background:#4d080c}
 ::-webkit-scrollbar-thumb{background:linear-gradient(#e6b422,#8a5a00);border-radius:5px}
@@ -436,6 +522,9 @@ footer .big{font-family:var(--kai);font-size:21px;color:var(--gold-bright);lette
     <button class="clear-btn" id="clearBtn" title="清空">✕</button>
   </div>
   <div class="stats">收录 <b id="stat-n">0</b> 道好菜 · <b>10</b> 大类别 · 精选 <b id="stat-f">0</b> 道年夜饭必备</div>
+  <div class="wheel-cta-row">
+    <button class="wheel-cta" id="wheelCta">🎯 转盘定菜 · 转到啥吃啥</button>
+  </div>
 </header>
 
 <div class="bar">
@@ -443,6 +532,7 @@ footer .big{font-family:var(--kai);font-size:21px;color:var(--gold-bright);lette
     <button class="cbtn" id="catBtn"><span class="ic" id="catBtnIc">🧨</span><span id="catBtnTx">全部</span><span class="car">▼</span></button>
     <div class="cats-wrap" id="catsWrap"><div class="cats" id="cats"></div></div>
     <button class="sortbtn" id="sortBtn"><span class="sp">排序：</span><span id="sortTx">推荐</span> ⇅</button>
+    <button class="wheelbtn" id="wheelBtn">🎯 转盘</button>
     <button class="tablebtn" id="tableBtn">我的桌<span class="n" id="tableN">0</span></button>
   </div>
 </div>
@@ -476,6 +566,42 @@ footer .big{font-family:var(--kai);font-size:21px;color:var(--gold-bright);lette
 
 <!-- 点菜单 -->
 <div class="overlay" id="sheetOverlay"><div class="sheet" id="sheet"></div></div>
+
+<!-- 转盘 -->
+<div class="wheel-ov" id="wheelOv">
+  <div class="wheel-panel">
+    <div class="w-head">
+      <h3>🎯 转盘定菜</h3>
+      <span class="hint">按住转盘不放 · 松手看天意</span>
+      <button class="cs-close" id="wheelClose">✕</button>
+    </div>
+    <div class="wheel-stage" id="wheelStage">
+      <canvas id="wheelCv"></canvas>
+      <div class="wheel-pointer"></div>
+      <div class="wheel-hub"><div class="hub-name" id="hubName">开始</div></div>
+    </div>
+    <button class="wheel-start" id="wheelStart">🎯 开始转</button>
+    <div class="wheel-hint">转盘上是 <b id="wheelN">0</b> 道好菜 · <b>按住转盘不放</b>会一直转，松手慢慢停 🧨</div>
+  </div>
+</div>
+
+<!-- 转盘结果 -->
+<div class="wheel-result" id="wheelResult">
+  <div class="wr-card">
+    <div class="wr-burst">🎉</div>
+    <div class="wr-cong">恭喜你选择了</div>
+    <div class="wr-name" id="wrName">红烧肉</div>
+    <div class="wr-sub" id="wrSub">年夜饭硬菜 · 难度 ★★☆</div>
+    <div class="wr-acts">
+      <button class="wr-main" id="wrView">👀 查看介绍</button>
+      <div class="wr-row">
+        <button class="wr-alt" id="wrAgain">🔄 再转一次</button>
+        <button class="wr-alt" id="wrAdd">＋ 点这道菜</button>
+      </div>
+      <button class="wr-alt wr-close" id="wrClose">关 闭</button>
+    </div>
+  </div>
+</div>
 
 <!-- 我的桌 -->
 <div class="mask" id="mask"></div>
@@ -1293,13 +1419,192 @@ document.getElementById("sortBtn").onclick=()=>{
   toast("排序："+SORTS[curSort].k);
 };
 document.addEventListener("keydown",e=>{
-  if(e.key==="Escape"){ closeDetail(); closeSheet(); closeDrawer(); closeCatOv(); }
+  if(e.key==="Escape"){ closeDetail(); closeSheet(); closeDrawer(); closeCatOv(); closeWheel(); }
 });
 function toast(msg){
   const t=document.getElementById("toast");
   t.textContent=msg; t.classList.add("show");
   clearTimeout(t._tid); t._tid=setTimeout(()=>t.classList.remove("show"),1900);
 }
+
+/* ================= 转盘定菜 ================= */
+/* 转盘上把所有菜分成一圈色块（373 道 ≈ 373 格，每格不到 1°，转起来像烟花）。
+   盘面预渲染到离屏 canvas，每帧只做旋转贴图，手机上也丝滑。
+   交互：按住转盘（或开始按钮）→ 一直转；松手 → 摩擦慢慢减速停稳。
+   转动时中心快速闪过当前指针指向的菜名；停稳后弹出「恭喜你选择了…」。 */
+const wheelOv=document.getElementById("wheelOv"),
+      wheelCv=document.getElementById("wheelCv"),
+      wheelStage=document.getElementById("wheelStage"),
+      hubName=document.getElementById("hubName"),
+      wheelResult=document.getElementById("wheelResult"),
+      wctx=wheelCv.getContext("2d");
+
+const WHEEL_COLORS=["#d4232e","#e6b422","#a31621","#f0c445"];
+let wDishes=[], wSeg=0, wRot=0, wVel=0, wHold=false, wSpin=false,
+    wRaf=0, wLast=0, wCur=-1, wWinner=null, wPlate=null, wResizeT=0;
+
+function wheelBuild(){
+  wDishes=DATA.slice();
+  const N=wDishes.length;
+  if(!N) return;
+  wSeg=Math.PI*2/N;
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const css=wheelStage.clientWidth||360;
+  const px=Math.round(css*dpr);
+  const c=document.createElement("canvas");
+  c.width=c.height=px;
+  const x=c.getContext("2d");
+  const cx=px/2, R=px/2-7*dpr;
+  // 外圈金环
+  x.beginPath(); x.arc(cx,cx,R+4.5*dpr,0,Math.PI*2);
+  x.lineWidth=8*dpr; x.strokeStyle="#b8860b"; x.stroke();
+  x.beginPath(); x.arc(cx,cx,R+4.5*dpr,0,Math.PI*2);
+  x.lineWidth=3*dpr; x.strokeStyle="#ffe08a"; x.stroke();
+  // 色块（每道菜一格）
+  for(let i=0;i<N;i++){
+    const a0=-Math.PI/2+i*wSeg, a1=a0+wSeg+0.0006;
+    x.beginPath(); x.moveTo(cx,cx); x.arc(cx,cx,R,a0,a1); x.closePath();
+    x.fillStyle=WHEEL_COLORS[i%WHEEL_COLORS.length]; x.fill();
+    if(N<=120){ x.lineWidth=Math.max(.6,dpr*.7); x.strokeStyle="rgba(80,8,12,.45)"; x.stroke(); }
+  }
+  // 中心金圈
+  x.beginPath(); x.arc(cx,cx,R*0.35,0,Math.PI*2);
+  x.fillStyle="#5c0a0e"; x.fill();
+  x.lineWidth=3.5*dpr; x.strokeStyle="#e6b422"; x.stroke();
+  wPlate=c;
+  wDraw();
+  document.getElementById("wheelN").textContent=N;
+}
+
+function wDraw(){
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const css=wheelStage.clientWidth||360;
+  const px=Math.round(css*dpr);
+  if(wheelCv.width!==px){ wheelCv.width=px; wheelCv.height=px; }
+  wctx.clearRect(0,0,px,px);
+  if(!wPlate) return;
+  wctx.save();
+  wctx.translate(px/2,px/2);
+  wctx.rotate(wRot);
+  wctx.drawImage(wPlate,-px/2,-px/2,px,px);
+  wctx.restore();
+}
+
+/* 指针（正上方）当前指向的菜 */
+function wIndex(){
+  const N=wDishes.length; if(!N) return -1;
+  const TAU=Math.PI*2;
+  let t=((-wRot)%TAU+TAU)%TAU;
+  return Math.min(N-1,Math.floor(t/wSeg));
+}
+
+function wTick(ts){
+  const dt=Math.min(0.05,(ts-wLast)/1000||0.016);
+  wLast=ts;
+  if(wHold){
+    wVel+=(26-wVel)*Math.min(1,dt*3.5);   // 按住 → 加速到最大
+    wSpin=true;
+  }else{
+    wVel*=Math.pow(0.32,dt);              // 松手 → 指数摩擦，慢慢停下
+    if(wSpin && wVel<0.28){ wVel=0; wFinish(); return; }
+  }
+  wRot+=wVel*dt;
+  wDraw();
+  const i=wIndex();
+  if(i!==wCur){                            // 中心快速闪过转到的菜
+    wCur=i;
+    if(wDishes[i]) hubName.textContent=wDishes[i].name;
+  }
+  wRaf=requestAnimationFrame(wTick);
+}
+
+function wFinish(){
+  wSpin=false;
+  if(wRaf){ cancelAnimationFrame(wRaf); wRaf=0; }
+  const d=wDishes[wIndex()];
+  if(!d) return;
+  hubName.textContent=d.name;
+  wWinner=d;
+  setTimeout(()=>{
+    document.getElementById("wrName").textContent=d.name;
+    document.getElementById("wrSub").textContent=
+      `${d.cat} · 难度 ${stars(d.difficulty)}`+(d.featured?" · 🏮 年夜饭精选":"");
+    wheelResult.classList.add("show");
+  },420);
+}
+
+function wDown(e){
+  if(e.cancelable) e.preventDefault();
+  if(!wDishes.length){ toast("菜谱还在加载中，稍等一下 🍲"); return; }
+  if(wheelResult.classList.contains("show")) return;
+  wHold=true; wSpin=true;
+  wLast=performance.now();
+  hubName.textContent="转着呢…";
+  if(!wRaf) wRaf=requestAnimationFrame(wTick);
+}
+function wUp(){
+  if(!wHold) return;
+  wHold=false;
+  if(wVel<10) wVel=13+Math.random()*9;    // 轻点一下也转得起来
+}
+
+function openWheel(){
+  if(!DATA.length){ toast("菜谱还在加载中，稍等一下 🍲"); return; }
+  if(!wDishes.length||wDishes.length!==DATA.length) wheelBuild(); else wDraw();
+  hubName.textContent="转到啥吃啥";
+  wheelResult.classList.remove("show");
+  wheelOv.classList.add("show");
+  document.body.style.overflow="hidden";
+}
+function closeWheel(){
+  wheelOv.classList.remove("show");
+  wheelResult.classList.remove("show");
+  wHold=false; wSpin=false; wVel=0;
+  if(wRaf){ cancelAnimationFrame(wRaf); wRaf=0; }
+  if(!detailOverlay.classList.contains("show")&&!sheetOverlay.classList.contains("show")) document.body.style.overflow="";
+}
+
+document.getElementById("wheelCta").onclick=openWheel;
+document.getElementById("wheelBtn").onclick=openWheel;
+document.getElementById("wheelClose").onclick=closeWheel;
+wheelOv.addEventListener("click",e=>{ if(e.target===wheelOv) closeWheel(); });
+
+/* 按住转盘 / 开始按钮 → 转；松开 → 停 */
+wheelStage.addEventListener("pointerdown",wDown);
+document.getElementById("wheelStart").addEventListener("pointerdown",wDown);
+window.addEventListener("pointerup",wUp);
+window.addEventListener("pointercancel",wUp);
+wheelStage.addEventListener("contextmenu",e=>e.preventDefault());
+document.getElementById("wheelStart").addEventListener("keydown",e=>{
+  if(e.key===" "||e.key==="Enter"){ e.preventDefault(); wDown(e); setTimeout(wUp,850); }
+});
+
+/* 结果弹窗 */
+document.getElementById("wrView").onclick=()=>{
+  const d=wWinner; wheelResult.classList.remove("show"); closeWheel();
+  if(d) openDetail(d.id);
+};
+document.getElementById("wrAgain").onclick=()=>{
+  wheelResult.classList.remove("show");
+  wHold=false; wSpin=true; wWinner=null;
+  wVel=21+Math.random()*6;
+  wLast=performance.now();
+  hubName.textContent="转着呢…";
+  if(!wRaf) wRaf=requestAnimationFrame(wTick);
+};
+document.getElementById("wrAdd").onclick=()=>{
+  if(!wWinner) return;
+  addDish(wWinner.id,1);
+  wheelResult.classList.remove("show");
+  closeWheel();
+};
+document.getElementById("wrClose").onclick=()=>{ wheelResult.classList.remove("show"); };
+wheelResult.addEventListener("click",e=>{ if(e.target===wheelResult) wheelResult.classList.remove("show"); });
+
+window.addEventListener("resize",()=>{
+  clearTimeout(wResizeT);
+  wResizeT=setTimeout(()=>{ if(wheelOv.classList.contains("show")&&wDishes.length){ wheelBuild(); } },180);
+});
 
 /* ================= 滚动加载 ================= */
 const lm=document.getElementById("loadmore");
