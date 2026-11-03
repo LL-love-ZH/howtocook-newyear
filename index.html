@@ -680,9 +680,9 @@ function bindCards(){
    这里改为：JS 统一接管 → 依次尝试多个源（WebP 优先，体积小一半）→ 失败自动重试
    （带时间戳绕 CDN 缓存的坏响应）→ 超时兜底 → 彻底失败降级为 emoji 占位 + 手动重试。
    同时限制并发数，避免几十个请求同时打 CDN 把它拖垮。 */
-const IMG_MAX_RETRY   = 3;      // 每个源最多重试次数
-const IMG_TIMEOUT     = 12000;  // 单次加载超时（毫秒）
-const IMG_MAX_CONCURRENT = 6;   // 最大并发请求数
+const IMG_MAX_RETRY   = 2;      // 每个源的重试轮数
+const IMG_TIMEOUT     = 8000;   // 单次加载超时（毫秒）—— 卡住就果断换源
+const IMG_MAX_CONCURRENT = 8;   // 最大并发请求数
 const imgState = new WeakMap();
 
 /* 浏览器是否支持 WebP（支持则优先用，体积约为 JPEG 的 60%） */
@@ -707,6 +707,27 @@ function imgRelease(){
   imgActive = Math.max(0, imgActive-1);
   imgPump();
 }
+
+/* 只有滚进视野附近才真正发起请求，避免一次性几十个请求把 CDN 打爆 */
+const imgObserver = ("IntersectionObserver" in window)
+  ? new IntersectionObserver(entries=>{
+      entries.forEach(en=>{
+        if(!en.isIntersecting) return;
+        const img = en.target;
+        imgObserver.unobserve(img);
+        if(img.dataset.imstarted) return;   // 已开始加载过
+        img.dataset.imstarted = "1";
+        const s = imgState.get(img);
+        if(!s) return;
+        // 进入队列，等有空位再发起
+        imgQueue.push(()=>{
+          if(!img.isConnected){ imgRelease(); return; }
+          imgAttempt(img);
+        });
+        imgPump();
+      });
+    }, {rootMargin:"400px 0px"})
+  : null;
 
 /* 生成候选 URL 列表：WebP 优先 → JPEG 兜底 → 带时间戳的绕缓存重试 */
 function imgUrls(st, attempt){
@@ -753,51 +774,62 @@ function imgAttempt(img){
   img.style.display = "";
   img.src = url;
 
-  // 超时兜底：某些请求会一直挂着不报错，必须自己判定失败
+  // 超时兜底：某些请求会一直挂着不报错（连接建立但数据不来），
+  // 必须自己判定失败，并主动 abort 以释放浏览器的连接槽位
   st.timer = setTimeout(()=>{
     if(img.complete && img.naturalWidth>0) return;   // 其实已成功
+    try{ img.src = ""; }catch(e){}                    // 中断挂起的请求
     imgAttempt(img);
   }, IMG_TIMEOUT);
 }
 
 function imgLoad(img, force){
   const prev = imgState.get(img);
-  if(prev && !force) return;
-  // 复用已有 state（手动重试时保留已修正的字段）
+  // 已创建过 state 且不是强制重试 → 只保证监听器与观察都已就绪
+  if(prev && !force){
+    if(!img.dataset.imbound) bindImgListeners(img);
+    if(imgObserver && !img.dataset.imobserved){ img.dataset.imobserved="1"; imgObserver.observe(img); }
+    return;
+  }
   const st = prev || {si:0, round:1, timer:null, src:img.dataset.src||"", srcWebp:img.dataset.webp||"",
                       done:false, released:false};
   st.src = img.dataset.src || st.src;
   st.srcWebp = img.dataset.webp || st.srcWebp;
   st.si = 0; st.round = 1;
   imgState.set(img, st);
+  bindImgListeners(img);
 
-  // 监听器只绑一次，避免重试时重复触发
-  if(!img.dataset.imbound){
-    img.dataset.imbound="1";
-    img.addEventListener("load", ()=>{
-      const s = imgState.get(img); if(!s) return;
-      if(s.timer){ clearTimeout(s.timer); s.timer=null; }
-      img.classList.add("loaded");
-      const pic = img.closest(".pic,.m-hero");
-      if(pic){ pic.classList.remove("loading","err"); pic.classList.add("ok"); }
-      if(!s.released){ s.released=true; imgRelease(); }
+  // 交给 IntersectionObserver：滚进视野附近才开始加载
+  if(imgObserver){
+    if(!img.dataset.imobserved){ img.dataset.imobserved="1"; imgObserver.observe(img); }
+  } else {
+    imgQueue.push(()=>{
+      if(!img.isConnected){ imgRelease(); return; }
+      imgAttempt(img);
     });
-    img.addEventListener("error", ()=>{
-      const s = imgState.get(img); if(!s) return;
-      if(s.timer){ clearTimeout(s.timer); s.timer=null; }
-      // 退避重试：避免网络瞬断时瞬间把所有重试打完
-      const delay = Math.min(700 * s.si, 2500);
-      setTimeout(()=>imgAttempt(img), delay);
-    });
+    imgPump();
   }
+}
 
-  // 进入队列，等有空位再真正发起请求
-  imgQueue.push(()=>{
-    // 元素可能已被移除（切换分类重渲染），此时跳过并释放槽位
-    if(!img.isConnected){ imgRelease(); return; }
-    imgAttempt(img);
+/* 绑定 load / error 监听（只绑一次） */
+function bindImgListeners(img){
+  if(img.dataset.imbound) return;
+  img.dataset.imbound="1";
+  img.addEventListener("load", ()=>{
+    const s = imgState.get(img); if(!s) return;
+    if(s.timer){ clearTimeout(s.timer); s.timer=null; }
+    img.classList.add("loaded");
+    const pic = img.closest(".pic,.m-hero");
+    if(pic){ pic.classList.remove("loading","err"); pic.classList.add("ok"); }
+    if(!s.released){ s.released=true; if(!s.noSlot) imgRelease(); }
   });
-  imgPump();
+  img.addEventListener("error", ()=>{
+    const s = imgState.get(img); if(!s) return;
+    if(s.timer){ clearTimeout(s.timer); s.timer=null; }
+    // 退避重试：避免网络瞬断时瞬间把所有重试打完
+    const delay = Math.min(700 * s.si, 2500);
+    setTimeout(()=>imgAttempt(img), delay);
+  });
 }
 
 /* 手动重试：点击失败卡片上的提示条 */
