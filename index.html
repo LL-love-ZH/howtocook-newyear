@@ -111,8 +111,14 @@ h1.title{font-family:var(--kai);font-size:clamp(42px,6.6vw,78px);font-weight:700
 .bar{position:sticky;top:0;z-index:6;background:linear-gradient(180deg,rgba(92,10,14,.97),rgba(92,10,14,.88));
   backdrop-filter:blur(8px);border-bottom:1px solid rgba(230,180,34,.28);box-shadow:0 4px 18px rgba(30,0,2,.4)}
 .bar-inner{max-width:1240px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px}
-.cats{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;flex:1;padding:2px}
+/* 分类栏可横向滚动，右侧渐隐提示"还有更多"，避免用户以为分类被截断了 */
+.cats-wrap{position:relative;flex:1;min-width:0}
+.cats-wrap::after{content:"";position:absolute;right:0;top:0;bottom:0;width:44px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(92,10,14,0),rgba(92,10,14,.92));border-radius:0 999px 999px 0}
+.cats{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px;scroll-behavior:smooth}
 .cats::-webkit-scrollbar{display:none}
+.cats-wrap.at-end::after{opacity:0}
+.cats-wrap.at-start::after{opacity:1}
 .tab{font-family:var(--kai);font-size:16.5px;letter-spacing:.08em;cursor:pointer;user-select:none;white-space:nowrap;
   color:var(--gold);background:rgba(90,8,10,.5);border:1.5px solid rgba(230,180,34,.4);
   padding:7px 16px;border-radius:999px;transition:.2s}
@@ -435,7 +441,7 @@ footer .big{font-family:var(--kai);font-size:21px;color:var(--gold-bright);lette
 <div class="bar">
   <div class="bar-inner">
     <button class="cbtn" id="catBtn"><span class="ic" id="catBtnIc">🧨</span><span id="catBtnTx">全部</span><span class="car">▼</span></button>
-    <div class="cats" id="cats"></div>
+    <div class="cats-wrap" id="catsWrap"><div class="cats" id="cats"></div></div>
     <button class="sortbtn" id="sortBtn"><span class="sp">排序：</span><span id="sortTx">推荐</span> ⇅</button>
     <button class="tablebtn" id="tableBtn">我的桌<span class="n" id="tableN">0</span></button>
   </div>
@@ -628,7 +634,20 @@ function renderCats(){
   });
   renderCsGrid();
   syncCatBtn();
+  syncCatsFade();
 }
+/* 分类栏右侧渐隐提示：滚到末尾就隐藏遮罩，提示没有更多了 */
+function syncCatsFade(){
+  const box=document.getElementById("cats"), wrap=document.getElementById("catsWrap");
+  if(!box||!wrap) return;
+  const atEnd = box.scrollLeft + box.clientWidth >= box.scrollWidth - 4;
+  wrap.classList.toggle("at-end", atEnd);
+}
+(function(){
+  const box=document.getElementById("cats");
+  if(box) box.addEventListener("scroll", syncCatsFade, {passive:true});
+  window.addEventListener("resize", syncCatsFade, {passive:true});
+})();
 /* 移动端分类宫格 */
 function renderCsGrid(){
   const grid=document.getElementById("csGrid");
@@ -649,6 +668,16 @@ function syncCatBtn(){
 }
 function pickCat(k){
   curCat=k; shown=0; renderCats(); renderGrid();
+  // 让选中的分类标签滚动到可见区域（分类栏可能横向溢出）
+  const box=document.getElementById("cats");
+  if(box){
+    const act=box.querySelector(".tab.active");
+    if(act){
+      const bl=box.getBoundingClientRect(), al=act.getBoundingClientRect();
+      if(al.left < bl.left || al.right > bl.right)
+        box.scrollTo({left: act.offsetLeft - box.clientWidth/2 + act.offsetWidth/2, behavior:"smooth"});
+    }
+  }
   const bar=document.querySelector(".bar");
   if(bar) window.scrollTo({top:bar.offsetTop-10,behavior:"smooth"});
 }
