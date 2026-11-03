@@ -700,9 +700,9 @@ function bindCards(){
      连接池被挂起请求占满 → 后续图片全部排队卡死 → 用户看到"图片时有时无"。
      改用 fetch 后可以用 AbortController 真正 abort 掉挂起的请求，
      连接立即归还池子，并发上限才真正生效，失败也能立刻换源重试。 */
-const IMG_MAX_RETRY   = 3;      // 每个源的重试轮数（比原来多留一轮余量）
-const IMG_TIMEOUT     = 15000;  // 单次加载超时（毫秒）—— 实测最慢成功请求 16s，取 15s 留余量
-const IMG_MAX_CONCURRENT = 6;   // 真实并发请求数上限（HTTP/1.1 单域连接池约 6，必须 ≤6）
+const IMG_MAX_RETRY   = 4;      // 每个源的重试轮数（比原来多留一轮余量）
+const IMG_TIMEOUT     = 9000;   // 单次加载超时（毫秒）—— 实测成功请求中位 1.3s，9s 足够宽松
+const IMG_MAX_CONCURRENT = 4;   // 真实并发请求数上限（配合速率节流使用）
 const imgState = new WeakMap();
 
 /* 浏览器是否支持 WebP（支持则优先用，体积约为 JPEG 的 60%） */
@@ -720,14 +720,15 @@ const imgQueue = [];
 const IMG_STAT = {started:0, ok:0, fail:0, timeout:0, abort:0, enqueued:0};
 if(typeof window!=="undefined") window.__imgStat = IMG_STAT;
 
-/* ---- 滚动速度自适应限流 ------------------------------------------------
+/* ---- 滚动速度自适应 + 速率节流 ----------------------------------------
    实测（2026-11-03，线上 GitHub Pages CDN）：
-     - 慢速滚动（每屏停 3 秒）：26 张全部加载成功，0 超时
-     - 快速滚动（连续 25 屏不停）：175 张瞬间涌入，CDN 边缘节点被打满，
-       请求大面积挂起 → 90% 超时 → 用户看到"图片时有时无"
-   也就是说 CDN 并非不可靠，而是**扛不住突发流量**。
-   解决办法：监测滚动速度，滚得快就收紧并发（少发请求、慢发），
-   滚得慢/停下来就逐步放开并发。 */
+     - 慢速滚动（每屏停 3 秒，26 个请求）：全部成功，0 超时
+     - 快速滚动（瞬间涌入 175 个请求）：大面积挂起 → 90% 超时
+   也就是说 CDN 并非不可靠，而是**扛不住突发请求速率**。
+   对策：
+     1) 监测滚动速度 —— 滚得快就少发、慢发，停下来再放开；
+     2) 请求之间强制最小间隔（节流），把速率压在 CDN 能承受的范围内；
+     3) 超时后冷却重试，不做立刻重排队（避免打-挂-重试死循环）。 */
 let imgLastScrollY = 0, imgLastScrollT = Date.now(), imgScrollSpeed = 0;
 function imgTrackScroll(){
   const y = window.scrollY || 0;
@@ -736,35 +737,37 @@ function imgTrackScroll(){
   imgScrollSpeed = Math.abs(y - imgLastScrollY) / dt;   // px/ms
   imgLastScrollY = y; imgLastScrollT = now;
 }
-/* 依滚动速度给出当前允许的并发数（1 ~ IMG_MAX_CONCURRENT） */
-function imgConcurrency(){
-  if(imgScrollSpeed > 2.5) return 2;        // 快速滚动：几乎暂停新请求
-  if(imgScrollSpeed > 1.0) return 3;        // 中速滚动：收紧
-  if(imgScrollSpeed > 0.35) return 4;       // 轻滚：适度放开
-  return IMG_MAX_CONCURRENT;                // 静止：全开
+/* 依滚动速度给出的最小请求间隔（毫秒）与并发上限 */
+function imgThrottle(){
+  if(imgScrollSpeed > 2.5) return {gap:900,  conc:1};
+  if(imgScrollSpeed > 1.0) return {gap:500,  conc:2};
+  if(imgScrollSpeed > 0.35) return {gap:250, conc:3};
+  return {gap:120, conc:IMG_MAX_CONCURRENT};
 }
 if(typeof window!=="undefined"){
   window.addEventListener("scroll", imgTrackScroll, {passive:true});
 }
+/* 发射器：保证任意两次请求之间至少间隔 gap 毫秒 */
+let imgLastFireT = 0;
 function imgPump(){
-  const limit = imgConcurrency();
-  while(imgActive < limit && imgQueue.length){
+  const th = imgThrottle();
+  const now = Date.now();
+  const wait = imgLastFireT + th.gap - now;
+  if(wait > 0){ imgSchedulePump(wait); return; }
+  let fired = 0;
+  while(imgActive < th.conc && imgQueue.length && fired < th.conc){
     const job = imgQueue.shift();
     imgActive++;
+    fired++;
+    imgLastFireT = Date.now();
     job();
   }
-  imgEnsureHeartbeat();
+  if(imgQueue.length) imgSchedulePump(Math.max(th.gap, 200));
 }
-/* 保底心跳：若所有在途请求都卡住（如被 CDN 限流），队列会停滞，
-   这里定期唤醒一次 pump，让排队中的图片有机会继续尝试。 */
-let imgHeartbeat = null;
-function imgEnsureHeartbeat(){
-  if(imgHeartbeat) return;
-  imgHeartbeat = setTimeout(()=>{
-    imgHeartbeat = null;
-    if(imgQueue.length && imgActive < imgConcurrency()) imgPump();
-    else if(imgQueue.length) imgEnsureHeartbeat();
-  }, 2000);
+let imgPumpTimer = null;
+function imgSchedulePump(delay){
+  if(imgPumpTimer) return;
+  imgPumpTimer = setTimeout(()=>{ imgPumpTimer = null; imgPump(); }, delay);
 }
 function imgRelease(){
   imgActive = Math.max(0, imgActive-1);
@@ -773,10 +776,10 @@ function imgRelease(){
 /* 把图片排进队列尾部（不占用槽位，槽位在真正取出时才占） */
 function imgEnqueue(img, delay){
   const run = ()=>{
+    IMG_STAT.enqueued++;
     if(!img.isConnected) return;
     const st = imgState.get(img);
     if(!st || st.done || st.failed) return;
-    IMG_STAT.enqueued++;
     imgQueue.push(()=>{
       if(!img.isConnected){ imgRelease(); return; }
       imgAttempt(img);
