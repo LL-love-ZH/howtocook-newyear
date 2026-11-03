@@ -737,12 +737,20 @@ function imgTrackScroll(){
   imgScrollSpeed = Math.abs(y - imgLastScrollY) / dt;   // px/ms
   imgLastScrollY = y; imgLastScrollT = now;
 }
+/* 速度衰减：停止滚动后，速度值应随时间回落，否则会一直卡在"慢速档"。
+   没有这个衰减，用户滚完停下后图片仍按最低速率加载，体验很差。 */
+function imgDecaySpeed(){
+  const idle = Date.now() - imgLastScrollT;
+  if(idle > 400) imgScrollSpeed *= 0.5;   // 每 2 秒衰减一半
+  if(imgScrollSpeed < 0.02) imgScrollSpeed = 0;
+}
 /* 依滚动速度给出的最小请求间隔（毫秒）与并发上限 */
 function imgThrottle(){
-  if(imgScrollSpeed > 2.5) return {gap:900,  conc:1};
-  if(imgScrollSpeed > 1.0) return {gap:500,  conc:2};
-  if(imgScrollSpeed > 0.35) return {gap:250, conc:3};
-  return {gap:120, conc:IMG_MAX_CONCURRENT};
+  imgDecaySpeed();
+  if(imgScrollSpeed > 2.5) return {gap:350, conc:2};
+  if(imgScrollSpeed > 1.0) return {gap:200, conc:3};
+  if(imgScrollSpeed > 0.35) return {gap:130, conc:4};
+  return {gap:90, conc:IMG_MAX_CONCURRENT};
 }
 if(typeof window!=="undefined"){
   window.addEventListener("scroll", imgTrackScroll, {passive:true});
@@ -803,7 +811,7 @@ const imgObserver = ("IntersectionObserver" in window)
         IMG_STAT.started++;
         imgEnqueue(img, 0);
       });
-    }, {rootMargin:"600px 0px"})
+    }, {rootMargin:"900px 0px"})
   : null;
 
 /* 生成候选 URL 列表：WebP 优先 → JPEG 兜底 → 带时间戳的绕缓存重试 */
