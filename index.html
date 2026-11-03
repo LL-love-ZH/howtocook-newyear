@@ -716,6 +716,9 @@ const WEBP_OK = (function(){
 
 let imgActive = 0;
 const imgQueue = [];
+/* 运行时计数器（用于排查加载异常，代价极小） */
+const IMG_STAT = {started:0, ok:0, fail:0, timeout:0, abort:0, enqueued:0};
+if(typeof window!=="undefined") window.__imgStat = IMG_STAT;
 function imgPump(){
   while(imgActive < IMG_MAX_CONCURRENT && imgQueue.length){
     const job = imgQueue.shift();
@@ -753,6 +756,7 @@ const imgObserver = ("IntersectionObserver" in window)
         img.dataset.imstarted = "1";
         const s = imgState.get(img);
         if(!s || s.done || s.failed) return;
+        IMG_STAT.started++;
         imgEnqueue(img, 0);
       });
     }, {rootMargin:"600px 0px"})
@@ -829,11 +833,13 @@ function imgAttempt(img){
     cleanup();
     if(ok){
       st.done = true;
+      IMG_STAT.ok++;
       img.classList.add("loaded");
       const p = img.closest(".pic,.m-hero");
       if(p){ p.classList.remove("loading","err"); p.classList.add("ok"); }
       imgRelease();
     }else{
+      IMG_STAT.fail++;
       // 退避重试：避免网络瞬断时瞬间把所有重试打完
       imgRelease();
       imgEnqueue(img, Math.min(700 * st.si, 2500));
@@ -844,6 +850,7 @@ function imgAttempt(img){
     if(gen !== st.gen) return;
     if(img.complete && img.naturalWidth>0){ finish(true); return; }
     // 超时 → abort 请求（连接立即归还池子），换下一个源重试
+    IMG_STAT.timeout++;
     cleanup();
     imgRelease();
     imgEnqueue(img, 0);
@@ -868,7 +875,7 @@ function imgAttempt(img){
     })
     .catch(err=>{
       if(gen !== st.gen) return;
-      if(err && err.name === "AbortError") return;   // 已被新一轮尝试取消
+      if(err && err.name === "AbortError"){ IMG_STAT.abort++; return; }
       finish(false);
     });
 }
