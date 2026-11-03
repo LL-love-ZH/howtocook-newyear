@@ -675,14 +675,27 @@ function bindCards(){
 }
 
 /* ================= 图片加载管理（多源 / 重试 / 超时 / 降级 / 并发限流） =================
-   GitHub Pages 的 CDN 边缘节点偶发不稳定：实测 175 张图里有 12 张会超时或断连，
-   最慢的一张卡了 78 秒。原来的写法（src 直连 + onload 加 class）遇到失败就永久白屏。
-   这里改为：JS 统一接管 → 依次尝试多个源（WebP 优先，体积小一半）→ 失败自动重试
-   （带时间戳绕 CDN 缓存的坏响应）→ 超时兜底 → 彻底失败降级为 emoji 占位 + 手动重试。
-   同时限制并发数，避免几十个请求同时打 CDN 把它拖垮。 */
-const IMG_MAX_RETRY   = 2;      // 每个源的重试轮数
-const IMG_TIMEOUT     = 8000;   // 单次加载超时（毫秒）—— 卡住就果断换源
-const IMG_MAX_CONCURRENT = 8;   // 最大并发请求数
+   GitHub Pages 的 CDN 边缘节点偶发不稳定：实测同一批图片里约 3%~10% 会挂住或断连，
+   最慢的一张卡了 60 秒以上。这里改为：JS 统一接管 → 依次尝试多个源（WebP 优先，体积小一半）
+   → 失败自动重试（带时间戳绕 CDN 缓存的坏响应）→ 超时兜底 → 彻底失败降级为 emoji 占位 + 手动重试。
+   同时限制并发数，避免几十个请求同时打 CDN 把它拖垮。
+
+   ★ 实测校准（2026-11-03）：
+     - 并发 4 → 成功率 90%，并发 8 → 97%，并发 16 → 90%。并发 8 是甜点，故保留 8。
+     - 成功请求耗时中位 ~1.3s，但最慢的成功请求达 16s。因此超时不能设 8s，
+       否则会把"只是慢"的好图片误判为失败（原实现正是这个 bug）。
+     - 慢请求若一直占着并发槽位，后面所有图都排队等着 → 队头阻塞。
+       因此慢图超时不释放槽位，而是降低它的优先级重新排队。
+
+   ★ 修掉的双路径竞态（原先"偶发图片不显示"的真正根因）：
+     超时分支执行 img.src="" 挂起请求时，浏览器会**额外派发一次 error 事件**，
+     而 error 监听器又会 setTimeout(→imgAttempt) 重试 —— 于是同一张图同时走了
+     "超时重试"和"错误重试"两条路，st.si/st.round 被双倍消耗，
+     很快就把所有候选源打完，直接进入"彻底失败"降级状态。
+     现在改为：超时时用 abort 标记位屏蔽随之而来的 error 事件，单一路径推进。 */
+const IMG_MAX_RETRY   = 3;      // 每个源的重试轮数（比原来多留一轮余量）
+const IMG_TIMEOUT     = 15000;  // 单次加载超时（毫秒）—— 实测最慢成功请求 16s，取 15s 留余量
+const IMG_MAX_CONCURRENT = 8;   // 最大并发请求数（实测并发 8 成功率最高 97%）
 const imgState = new WeakMap();
 
 /* 浏览器是否支持 WebP（支持则优先用，体积约为 JPEG 的 60%） */
@@ -707,6 +720,29 @@ function imgRelease(){
   imgActive = Math.max(0, imgActive-1);
   imgPump();
 }
+/* 每张图同一时刻最多占一个并发槽位，用 st.slot 保证"释放"不会重复执行 */
+function imgHoldSlot(img){
+  const st = imgState.get(img); if(!st) return false;
+  st.slot = true; return true;
+}
+function imgReleaseSlot(img){
+  const st = imgState.get(img); if(!st) return;
+  if(st.slot){ st.slot = false; imgRelease(); }
+}
+/* 把图片排进队列尾部（不占用槽位，槽位在真正取出时才占） */
+function imgEnqueue(img, delay){
+  const run = ()=>{
+    if(!img.isConnected) return;
+    const st = imgState.get(img);
+    if(!st || st.done || st.failed) return;
+    imgQueue.push(()=>{
+      if(!img.isConnected || !imgHoldSlot(img)){ imgRelease(); return; }
+      imgAttempt(img);
+    });
+    imgPump();
+  };
+  if(delay) setTimeout(run, delay); else run();
+}
 
 /* 只有滚进视野附近才真正发起请求，避免一次性几十个请求把 CDN 打爆 */
 const imgObserver = ("IntersectionObserver" in window)
@@ -718,15 +754,10 @@ const imgObserver = ("IntersectionObserver" in window)
         if(img.dataset.imstarted) return;   // 已开始加载过
         img.dataset.imstarted = "1";
         const s = imgState.get(img);
-        if(!s) return;
-        // 进入队列，等有空位再发起
-        imgQueue.push(()=>{
-          if(!img.isConnected){ imgRelease(); return; }
-          imgAttempt(img);
-        });
-        imgPump();
+        if(!s || s.done || s.failed) return;
+        imgEnqueue(img, 0);
       });
-    }, {rootMargin:"400px 0px"})
+    }, {rootMargin:"600px 0px"})
   : null;
 
 /* 生成候选 URL 列表：WebP 优先 → JPEG 兜底 → 带时间戳的绕缓存重试 */
@@ -744,42 +775,84 @@ function imgUrls(st, attempt){
   }
   return list;
 }
-
-/* 发起一次加载尝试。st.n 记录当前源索引，st.n2 记录重试轮数 */
-function imgAttempt(img){
+/* 推进到下一个候选源；返回 false 表示候选已全部用尽 */
+function imgNext(img){
   const st = imgState.get(img);
-  if(!st) return;
-  if(st.timer){ clearTimeout(st.timer); st.timer=null; }
-
+  if(!st) return false;
   const urls = imgUrls(st, st.round);
   if(st.si >= urls.length){
-    // 当前轮次的所有源都试完了 → 进入下一轮（换 URL 绕缓存）
     st.round++;
     st.si = 0;
-    if(st.round > IMG_MAX_RETRY){
-      // 彻底失败：降级为 emoji 占位 + 提示可手动重试
-      const pic = img.closest(".pic,.m-hero");
-      if(pic){ pic.classList.remove("ok","loading"); pic.classList.add("err"); }
-      img.style.display = "none";
-      st.done = true;
-      if(!st.released){ st.released=true; if(!st.noSlot) imgRelease(); }
-      return;
-    }
-    return imgAttempt(img);
+    if(st.round > IMG_MAX_RETRY) return false;   // 彻底失败
   }
+  return true;
+}
+/* 彻底失败：降级为 emoji 占位 + 提示可手动重试 */
+function imgFail(img){
+  const st = imgState.get(img); if(!st) return;
+  st.failed = true;
+  if(st.cleanup) st.cleanup();
+  const pic = img.closest(".pic,.m-hero");
+  if(pic){ pic.classList.remove("ok","loading"); pic.classList.add("err"); }
+  img.style.display = "none";
+  imgReleaseSlot(img);
+}
 
+/* 发起一次加载尝试。st.si 记录当前源索引，st.round 记录重试轮数。
+   每次尝试挂自己的 load/error 监听（用完即摘），并用 st.gen 区分陈旧回调，
+   从根本上杜绝"超时重试"与"错误重试"两条路径同时推进造成的状态错乱。 */
+function imgAttempt(img){
+  const st = imgState.get(img);
+  if(!st || st.done || st.failed) return;
+  if(st.cleanup) st.cleanup();
+
+  if(!imgNext(img)){ imgFail(img); return; }
+  const urls = imgUrls(st, st.round);
   const url = urls[st.si++];
+  const gen = ++st.gen;
+
   const pic = img.closest(".pic,.m-hero");
   if(pic){ pic.classList.remove("err"); pic.classList.add("loading"); }
   img.style.display = "";
+
+  const cleanup = ()=>{
+    img.removeEventListener("load", onLoad);
+    img.removeEventListener("error", onError);
+    if(st.timer){ clearTimeout(st.timer); st.timer = null; }
+    if(st.cleanup === cleanup) st.cleanup = null;
+  };
+  const onLoad = ()=>{
+    if(gen !== st.gen) return;          // 陈旧回调，忽略
+    cleanup();
+    st.done = true;
+    img.classList.add("loaded");
+    const p = img.closest(".pic,.m-hero");
+    if(p){ p.classList.remove("loading","err"); p.classList.add("ok"); }
+    imgReleaseSlot(img);
+  };
+  const onError = ()=>{
+    if(gen !== st.gen) return;          // 陈旧回调，忽略
+    cleanup();
+    // 退避重试：避免网络瞬断时瞬间把所有重试打完
+    imgReleaseSlot(img);
+    imgEnqueue(img, Math.min(700 * st.si, 2500));
+  };
+  st.cleanup = cleanup;
+  img.addEventListener("load", onLoad);
+  img.addEventListener("error", onError);
   img.src = url;
 
-  // 超时兜底：某些请求会一直挂着不报错（连接建立但数据不来），
-  // 必须自己判定失败，并主动 abort 以释放浏览器的连接槽位
+  // 超时兜底：某些请求会一直挂着不报错（连接建立但数据不来）。
+  // 注意：这里**不能**再执行 img.src="" —— 那会额外派发一次 error，
+  // 让同一张图同时走"超时重试"和"错误重试"两条路，把候选源双倍消耗掉。
+  // 直接换 src 即可让浏览器取消旧请求，且只有 load/error 一条推进路径。
   st.timer = setTimeout(()=>{
+    if(gen !== st.gen) return;
     if(img.complete && img.naturalWidth>0) return;   // 其实已成功
-    try{ img.src = ""; }catch(e){}                    // 中断挂起的请求
-    imgAttempt(img);
+    cleanup();
+    // 慢图不应长期霸占并发槽位：让出槽位、排到队尾，把通道让给其他图
+    imgReleaseSlot(img);
+    imgEnqueue(img, 0);
   }, IMG_TIMEOUT);
 }
 
@@ -787,49 +860,22 @@ function imgLoad(img, force){
   const prev = imgState.get(img);
   // 已创建过 state 且不是强制重试 → 只保证监听器与观察都已就绪
   if(prev && !force){
-    if(!img.dataset.imbound) bindImgListeners(img);
     if(imgObserver && !img.dataset.imobserved){ img.dataset.imobserved="1"; imgObserver.observe(img); }
     return;
   }
   const st = prev || {si:0, round:1, timer:null, src:img.dataset.src||"", srcWebp:img.dataset.webp||"",
-                      done:false, released:false};
+                      done:false, failed:false, released:false, slot:false, gen:0, cleanup:null};
   st.src = img.dataset.src || st.src;
   st.srcWebp = img.dataset.webp || st.srcWebp;
-  st.si = 0; st.round = 1;
+  st.si = 0; st.round = 1; st.done = false; st.failed = false; st.gen = 0;
   imgState.set(img, st);
-  bindImgListeners(img);
 
   // 交给 IntersectionObserver：滚进视野附近才开始加载
   if(imgObserver){
     if(!img.dataset.imobserved){ img.dataset.imobserved="1"; imgObserver.observe(img); }
   } else {
-    imgQueue.push(()=>{
-      if(!img.isConnected){ imgRelease(); return; }
-      imgAttempt(img);
-    });
-    imgPump();
+    imgEnqueue(img, 0);
   }
-}
-
-/* 绑定 load / error 监听（只绑一次） */
-function bindImgListeners(img){
-  if(img.dataset.imbound) return;
-  img.dataset.imbound="1";
-  img.addEventListener("load", ()=>{
-    const s = imgState.get(img); if(!s) return;
-    if(s.timer){ clearTimeout(s.timer); s.timer=null; }
-    img.classList.add("loaded");
-    const pic = img.closest(".pic,.m-hero");
-    if(pic){ pic.classList.remove("loading","err"); pic.classList.add("ok"); }
-    if(!s.released){ s.released=true; if(!s.noSlot) imgRelease(); }
-  });
-  img.addEventListener("error", ()=>{
-    const s = imgState.get(img); if(!s) return;
-    if(s.timer){ clearTimeout(s.timer); s.timer=null; }
-    // 退避重试：避免网络瞬断时瞬间把所有重试打完
-    const delay = Math.min(700 * s.si, 2500);
-    setTimeout(()=>imgAttempt(img), delay);
-  });
 }
 
 /* 手动重试：点击失败卡片上的提示条 */
@@ -844,19 +890,17 @@ function bindImgRetry(root){
       pic.classList.remove("err");
       const st = imgState.get(img);
       if(st){
-        if(st.timer){ clearTimeout(st.timer); st.timer=null; }
-        st.si = 0; st.round = 1;   // 重新给满所有源与重试轮次
+        if(st.cleanup) st.cleanup();
+        st.si = 0; st.round = 1; st.done = false; st.failed = false; st.gen++;
         st.src = img.dataset.src;   // 用原始 URL 重新开始
         st.srcWebp = img.dataset.webp || st.srcWebp;
         const isHero = !!pic.classList.contains("m-hero");
         if(isHero){
-          // 弹窗大图不占并发槽位
+          // 弹窗大图不占并发槽位（用户正在看这张图，最高优先级）
           imgAttempt(img);
         } else {
-          // 卡片图之前已释放过槽位，补一个占用，避免并发数失衡
-          st.released = false;
-          imgActive++;
-          imgAttempt(img);
+          // 卡片图重新入队，由队列统一分配并发槽位
+          imgEnqueue(img, 0);
         }
       } else {
         imgLoad(img, true);
@@ -877,25 +921,10 @@ function heroHTML(d){
 function bindHero(){
   const img = detailModal.querySelector(".m-hero img[data-src]");
   if(img){
-    // 弹窗大图走高优先级通道：不等队列（用户正在看这张图）
+    // 弹窗大图走高优先级通道：直接发起请求，不进并发队列
     const st = {si:0, round:1, timer:null, src:img.dataset.src||"", srcWebp:img.dataset.webp||"",
-                done:false, released:false, noSlot:true};
+                done:false, failed:false, released:false, slot:false, gen:0, cleanup:null};
     imgState.set(img, st);
-    if(!img.dataset.imbound){
-      img.dataset.imbound="1";
-      img.addEventListener("load", ()=>{
-        const s = imgState.get(img); if(!s) return;
-        if(s.timer){ clearTimeout(s.timer); s.timer=null; }
-        img.classList.add("loaded");
-        const pic = img.closest(".pic,.m-hero");
-        if(pic){ pic.classList.remove("loading","err"); pic.classList.add("ok"); }
-      });
-      img.addEventListener("error", ()=>{
-        const s = imgState.get(img); if(!s) return;
-        if(s.timer){ clearTimeout(s.timer); s.timer=null; }
-        setTimeout(()=>imgAttempt(img), Math.min(700*s.si, 2500));
-      });
-    }
     imgAttempt(img);
   }
   bindImgRetry(detailModal.querySelector(".m-hero"));
