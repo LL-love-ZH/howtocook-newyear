@@ -719,12 +719,14 @@ function bindCards(){
      连接池被挂起请求占满 → 后续图片全部排队卡死 → 用户看到"图片时有时无"。
      改用 fetch 后可以用 AbortController 真正 abort 掉挂起的请求，
      连接立即归还池子，并发上限才真正生效，失败也能立刻换源重试。 */
-const IMG_MAX_RETRY   = 4;      // 每个源的重试轮数（比原来多留一轮余量）
-const IMG_TIMEOUT     = 25000;  // 单次加载超时（毫秒）
+const IMG_MAX_RETRY   = 5;      // 每个源的重试轮数（WebP+JPEG 两源 × 5 轮 = 10 次 URL 尝试）
+const IMG_TIMEOUT     = 12000;  // 单次加载超时（毫秒）
    /* 实测：即使串行 100ms 间隔请求，也有约 7% 的图片要 20 秒以上才响应
       （GitHub Pages CDN 边缘节点在部分网络下极不稳定）。
-      超时设得太短会把"只是慢"的好图片误判为失败 —— 之前设 8~15 秒时
-      实测有 90% 的请求被误杀。25 秒能覆盖绝大多数情况。 */
+      超时太长会让队列推进极慢（一张卡 25 秒，后面 170 张全在排队）；
+      超时太短又会把"只是慢"的好图片误判为失败。
+      这里取 12 秒：既能覆盖绝大多数正常请求，又能较快换到下一个源
+      （换源时 URL 带时间戳，绕开 CDN 缓存的坏响应）。 */
 const IMG_MAX_CONCURRENT = 3;   // 真实并发请求数上限（配合速率节流使用）
 const imgState = new WeakMap();
 
@@ -774,10 +776,10 @@ function imgDecaySpeed(){
 /* 依滚动速度给出的最小请求间隔（毫秒）与并发上限 */
 function imgThrottle(){
   imgDecaySpeed();
-  if(imgScrollSpeed > 2.5) return {gap:350, conc:2};
-  if(imgScrollSpeed > 1.0) return {gap:200, conc:3};
-  if(imgScrollSpeed > 0.35) return {gap:130, conc:4};
-  return {gap:90, conc:IMG_MAX_CONCURRENT};
+  if(imgScrollSpeed > 2.5) return {gap:250, conc:2};
+  if(imgScrollSpeed > 1.0) return {gap:150, conc:3};
+  if(imgScrollSpeed > 0.35) return {gap:110, conc:4};
+  return {gap:70, conc:IMG_MAX_CONCURRENT};
 }
 if(typeof window!=="undefined"){
   window.addEventListener("scroll", imgTrackScroll, {passive:true});
